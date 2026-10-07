@@ -56,6 +56,22 @@ export function formDedupeKey(f: FormInput): string {
   return crypto.createHash('sha256').update(normalized).digest('hex');
 }
 
+/** Short single-token reference (letters and digits only, so HubSpot search treats it as one token). */
+export function dealRef(f: FormInput): string {
+  return 'FH' + formDedupeKey(f).slice(0, 12);
+}
+
+async function findDealByRef(deps: SyncDeps, ref: string): Promise<number | null> {
+  const found = await deps.request<{ results: { id: string; properties: { dealname?: string } }[] }>(
+    'POST', '/crm/v3/objects/deals/search', {
+      filterGroups: [{ filters: [{ propertyName: 'dealname', operator: 'CONTAINS_TOKEN', value: ref }] }],
+      properties: ['dealname'],
+      limit: 1,
+    });
+  const hit = found.results.find((d) => d.properties.dealname?.includes(`(ref ${ref})`));
+  return hit ? Number(hit.id) : null;
+}
+
 interface Claim {
   submission_id: number;
   outcome: 'new' | 'resume' | 'in_progress' | 'done';
@@ -77,6 +93,7 @@ export async function submitForm(f: FormInput, deps: SyncDeps): Promise<SubmitRe
   }
 
   const id = claim.submission_id;
+  const ref = dealRef(f);
   try {
     let contactId = claim.hubspot_contact_id;
     if (!claim.contact_done || contactId === null) {
@@ -93,11 +110,15 @@ export async function submitForm(f: FormInput, deps: SyncDeps): Promise<SubmitRe
     }
 
     let dealId = claim.hubspot_deal_id;
-    if (!claim.deal_done || dealId === null) {
+    if ((!claim.deal_done || dealId === null) && claim.outcome === 'resume') {
+      // A previous attempt may have created the deal and died before recording it: find it by ref.
+      dealId = await findDealByRef(deps, ref);
+    }
+    if (dealId === null) {
       const product = PRODUCTS[f.product];
       const deal = await deps.request<{ id: string }>('POST', '/crm/v3/objects/deals', {
         properties: {
-          dealname: `Fernhill demo: ${product.label} x ${f.quantity}`,
+          dealname: `Fernhill demo: ${product.label} x ${f.quantity} (ref ${ref})`,
           amount: String(product.unitPrice * f.quantity),
           pipeline: 'default',
           dealstage: 'appointmentscheduled',

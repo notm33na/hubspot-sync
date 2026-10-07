@@ -245,7 +245,8 @@ select pg_temp.check(
      from public.customers where hubspot_contact_id = 9001),
   'delete: soft-deletes and clears PII');
 select pg_temp.check(
-  public.apply_hubspot_contact(9001, 'back@example.com', 'Back', 'Again', null, 'lead', '2026-10-02T10:00Z') = 'updated',
+  -- A real restore happens after the delete, so HubSpot's timestamp is later than the delete time.
+  public.apply_hubspot_contact(9001, 'back@example.com', 'Back', 'Again', null, 'lead', now() + interval '1 minute') = 'updated',
   'restore: later state applies');
 select pg_temp.check((select deleted_at is null from public.customers where hubspot_contact_id = 9001),
   'restore: clears deleted_at');
@@ -272,6 +273,25 @@ select pg_temp.check(
   (select count(*) = 2 from public.orders_for_contact(9002, 2, 0))
   and (select count(*) = 2 from public.orders_for_contact(9002, 2, 2)),
   'card query pages through all 4 orders');
+
+-- ------------------------------------------------------------ review fixes
+select public.apply_hubspot_contact(9100, 'race@example.com', 'Race', 'Case', null, 'lead', now() - interval '1 minute');
+select public.apply_hubspot_delete(9100);
+-- A fetch that started before the delete arrives late with an older HubSpot timestamp.
+select pg_temp.check(
+  public.apply_hubspot_contact(9100, 'race@example.com', 'Race', 'Case', null, 'lead', now() - interval '30 seconds') = 'stale',
+  'delete wins over an in-flight older fetch');
+select pg_temp.check(
+  (select deleted_at is not null and email is null from public.customers where hubspot_contact_id = 9100),
+  'late stale fetch does not restore personal data');
+
+delete from public.sync_outbox;
+insert into public.sync_outbox (kind, customer_id) values ('rollup', '00000000-0000-0000-0000-00000000000a');
+select count(*) from public.claim_outbox(5);
+select public.release_jobs('outbox', array(select id from public.sync_outbox));
+select pg_temp.check(
+  (select status = 'pending' and attempts = 0 and claimed_at is null from public.sync_outbox),
+  'release_jobs returns an unstarted row to pending without using an attempt');
 
 -- ---------------------------------------------------------- drain signal
 delete from public.sync_outbox;

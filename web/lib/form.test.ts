@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { HubSpotError, type RequestFn } from './hubspot';
-import { formDedupeKey, submitForm, validateForm, type FormInput } from './form';
+import { dealRef, formDedupeKey, submitForm, validateForm, type FormInput } from './form';
 import { contact, deps, fakeDb } from './testing/fakes';
 
 const valid: FormInput = {
@@ -20,7 +20,7 @@ describe('validateForm', () => {
   });
 
   it('rejects real-looking emails, unknown products and bad quantities', () => {
-    const r = validateForm({ ...valid, email: 'jordan@gmail.com', product: 'rocket', quantity: 0 });
+    const r = validateForm({ ...valid, email: 'jordan@example.org', product: 'rocket', quantity: 0 });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(Object.keys(r.errors).sort()).toEqual(['email', 'product', 'quantity']);
   });
@@ -68,11 +68,24 @@ describe('submitForm', () => {
 
   it('resumes after a failure: skips the finished contact step, creates only the deal', async () => {
     const { db } = fakeDb({ claim_form_submission: claim({ outcome: 'resume', contact_done: true, hubspot_contact_id: 500 }) });
-    const request = vi.fn(async () => ({ id: '901' })) as unknown as RequestFn;
+    const request = vi.fn(async (_m: string, path: string) =>
+      path.endsWith('/search') ? { results: [] } : { id: '901' }) as unknown as RequestFn;
     const r = await submitForm(valid, deps(db, request));
     expect(r).toMatchObject({ dealId: 901 });
-    expect(request).toHaveBeenCalledTimes(1);
-    expect(request).toHaveBeenCalledWith('POST', '/crm/v3/objects/deals', expect.anything());
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(request).toHaveBeenLastCalledWith('POST', '/crm/v3/objects/deals', expect.objectContaining({
+      properties: expect.objectContaining({ dealname: expect.stringContaining(`(ref ${dealRef(valid)})`) }),
+    }));
+  });
+
+  it('on resume, reuses a deal an earlier attempt created but never recorded', async () => {
+    const { db } = fakeDb({ claim_form_submission: claim({ outcome: 'resume', contact_done: true, hubspot_contact_id: 500 }) });
+    const request = vi.fn(async () => ({
+      results: [{ id: '777', properties: { dealname: `Fernhill demo: x (ref ${dealRef(valid)})` } }],
+    })) as unknown as RequestFn;
+    const r = await submitForm(valid, deps(db, request));
+    expect(r).toMatchObject({ dealId: 777 });
+    expect(request).not.toHaveBeenCalledWith('POST', '/crm/v3/objects/deals', expect.anything());
   });
 
   it('marks the submission failed and rethrows when HubSpot fails', async () => {

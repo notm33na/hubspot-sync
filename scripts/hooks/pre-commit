@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Secret scan on staged changes (R8). Enable once per clone:  git config core.hooksPath scripts/hooks
+# Install gitleaks (free): winget install Gitleaks.Gitleaks   |   brew install gitleaks
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "pre-commit: gitleaks is not installed, so staged changes were NOT scanned for secrets." >&2
+  echo "            Install it: winget install Gitleaks.Gitleaks" >&2
+  exit 0
+fi
+exec gitleaks git --staged --redact --no-banner

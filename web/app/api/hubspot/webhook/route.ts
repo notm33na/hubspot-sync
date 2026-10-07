@@ -48,7 +48,7 @@ export async function POST(request: Request): Promise<Response> {
 
   // Respond inside HubSpot's 5 s timeout; process afterwards. The per-minute drain covers a cut-short run.
   waitUntil(
-    drainInbox(deps, Date.now() + 45_000)
+    drainInbox(deps, Date.now() + 35_000)
       .then((stats) => log('webhook_drain', { ...stats }))
       .catch((err) => log('webhook_drain_failed', { error: (err as Error).message })),
   );

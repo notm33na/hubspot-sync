@@ -1,6 +1,6 @@
 // Flow B — Supabase -> HubSpot (ARCHITECTURE §5).
 import type { OutboxRow } from '../db';
-import { findOrCreateContact, HubSpotError } from '../hubspot';
+import { findOrCreateContact, HubSpotError, isDemoEmail } from '../hubspot';
 import { refreshContact, type JobResult, type SyncDeps } from './inbound';
 
 interface Rollup {
@@ -15,6 +15,8 @@ export class PermanentJobError extends Error {
   readonly permanent = true;
 }
 
+const MAX_LINK_WAIT_MS = 30 * 60 * 1000;
+
 export async function processOutboxJob(job: OutboxRow, deps: SyncDeps): Promise<JobResult> {
   return job.kind === 'rollup' ? rollup(job, deps) : linkContact(job, deps);
 }
@@ -24,7 +26,10 @@ async function rollup(job: OutboxRow, deps: SyncDeps): Promise<JobResult> {
   if (!r || r.is_deleted) return { status: 'skipped', action: 'rollup', outcome: 'customer missing or deleted' };
 
   if (r.hubspot_contact_id === null) {
-    // Not linked yet (link_contact still pending): wait without using up attempts.
+    // Not linked yet (link_contact still pending): wait without using up attempts, but not forever:
+    // if linking itself is parked, this roll-up must surface as dead rather than loop silently.
+    const ageMs = job.created_at ? Date.now() - Date.parse(job.created_at) : 0;
+    if (ageMs > MAX_LINK_WAIT_MS) throw new PermanentJobError('customer still not linked to HubSpot after 30 minutes');
     const outcome = await deps.db.rpc<string>('requeue_outbox', { p_id: job.id, p_delay_seconds: 60 });
     return { status: 'requeued', action: 'rollup', outcome: `not linked yet, ${outcome}` };
   }
@@ -52,6 +57,7 @@ async function linkContact(job: OutboxRow, deps: SyncDeps): Promise<JobResult> {
   if (!c || c.deleted_at) return { status: 'skipped', action: 'link_contact', outcome: 'customer missing or deleted' };
   if (c.hubspot_contact_id !== null) return { status: 'skipped', action: 'link_contact', outcome: 'already linked' };
   if (!c.email) throw new PermanentJobError('customer has no email to link by');
+  if (!isDemoEmail(c.email)) throw new PermanentJobError('customer email is outside the demo domain');
 
   const { contact, created } = await findOrCreateContact(deps.request, {
     email: c.email,

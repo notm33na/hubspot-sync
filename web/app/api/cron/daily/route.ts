@@ -9,6 +9,7 @@ export const maxDuration = 300;
 
 export async function GET(request: Request): Promise<Response> {
   if (!hasBearer(request, env('CRON_SECRET'))) {
+    log('daily_rejected');
     return new Response('unauthorized', { status: 401 });
   }
   const deps = syncDeps();
@@ -17,7 +18,7 @@ export async function GET(request: Request): Promise<Response> {
     log('daily', { ...stats });
     await deps.db.log({
       direction: 'system', object_id: null, action: 'daily',
-      outcome: `${stats.recentContacts} recent, ${stats.checkedLinked} checked${stats.timedOut ? ', timed out' : ''}`,
+      outcome: `${stats.recentContacts} recent, ${stats.checkedLinked} checked, ${stats.errors} errors${stats.timedOut ? ', timed out' : ''}`,
     });
     return Response.json(stats);
   } catch (err) {

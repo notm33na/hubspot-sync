@@ -13,7 +13,8 @@ Audience: prospective HubSpot clients now, and the HubSpot partner directory lat
 ## 2. The demo company
 
 **Fernhill Supply Co. is fictional.** Every page, card and README says so. All data is synthetic:
-names are generated, emails use `@example.com`, orders are seeded. No real customer data is ever stored.
+names are generated, emails use `@example.com`, orders are seeded. No real customer data is ever stored:
+the sync only mirrors HubSpot contacts with an `@example.com` email, and clears any stored contact whose email leaves that domain.
 
 ## 3. Users
 
@@ -29,7 +30,7 @@ Priority: **M** = must for v1, **S** = should.
 
 | ID | Pri | Requirement | Acceptance |
 |---|---|---|---|
-| R1 | M | **HubSpot → Supabase contact sync.** Creating a contact or changing an owned field (§5) in HubSpot updates the Supabase customer. | A UI edit shows in Supabase within 2 min (within 10 min after a 5-min outage); duplicate or out-of-order webhooks leave one correct row. |
+| R1 | M | **HubSpot → Supabase contact sync.** Creating an `@example.com` contact or changing an owned field (§5) in HubSpot updates the Supabase customer. Other contacts are never stored. | A UI edit shows in Supabase within 2 min (within 10 min after a 5-min outage); duplicate or out-of-order webhooks leave one correct row. |
 | R2 | M | **HubSpot deletes.** Deleting a contact in HubSpot soft-deletes the customer and clears its personal fields in Supabase; orders are kept. A restored contact is un-deleted. | After delete: `deleted_at` set and name, email and phone null. A delete whose webhook was lost is caught by the next daily run. |
 | R3 | M | **Supabase → HubSpot order roll-ups.** Inserting, updating or deleting an order updates the contact's `demo_total_orders`, `demo_lifetime_value` and `demo_last_order_date`. | Roll-ups match Supabase within 2 min (within 10 min after a 5-min HubSpot outage). |
 | R4 | M | **Supabase-created customers.** A customer created in Supabase without a HubSpot ID is linked to the HubSpot contact with that email, or creates one. | One contact per email; an existing contact's name is never overwritten; the customer row stores `hubspot_contact_id`. |

@@ -1,6 +1,6 @@
 // Flow A — HubSpot -> Supabase (ARCHITECTURE §4).
 import type { HubSpotEvent, SyncDb } from '../db';
-import { CONTACT_MODIFIED, getContact, type HubSpotContact, type RequestFn } from '../hubspot';
+import { CONTACT_MODIFIED, getContact, isDemoEmail, type HubSpotContact, type RequestFn } from '../hubspot';
 
 export interface SyncDeps {
   db: SyncDb;
@@ -14,9 +14,9 @@ export interface JobResult {
   outcome: string;
 }
 
+// eventId alone is not guaranteed unique, so it is combined with the fields a retry repeats unchanged.
 export function dedupeKey(e: HubSpotEvent): string {
-  if (e.eventId !== undefined) return `e:${e.eventId}`;
-  return `s:${e.subscriptionId}:${e.objectId}:${e.propertyName ?? ''}:${e.occurredAt}`;
+  return [e.eventId ?? '', e.subscriptionId ?? '', e.objectId, e.propertyName ?? '', e.occurredAt ?? ''].join(':');
 }
 
 function isContactEvent(e: HubSpotEvent): boolean {
@@ -63,6 +63,18 @@ export async function refreshContact(id: string, deps: SyncDeps): Promise<string
   if (contact.id !== id) {
     // HubSpot answered with the surviving record of a merge.
     await deps.db.rpc('apply_hubspot_merge', { p_old_id: Number(id), p_new_id: Number(contact.id) });
+  }
+  return applyContact(contact, deps);
+}
+
+/**
+ * Apply a fetched contact. Contacts outside the demo domain are never stored: if one is already
+ * known (e.g. its email changed), it is soft-deleted and its personal data cleared.
+ */
+export async function applyContact(contact: HubSpotContact, deps: SyncDeps): Promise<string> {
+  if (!isDemoEmail(contact.properties.email)) {
+    const outcome = await deps.db.rpc<string>('apply_hubspot_delete', { p_contact_id: Number(contact.id) });
+    return outcome === 'deleted' ? 'cleared (not demo data)' : 'ignored (not demo data)';
   }
   return deps.db.rpc<string>('apply_hubspot_contact', applyArgs(contact));
 }

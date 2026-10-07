@@ -22,6 +22,7 @@ export interface OutboxRow {
   kind: 'rollup' | 'link_contact';
   customer_id: string;
   attempts: number;
+  created_at?: string;
 }
 
 export interface HubSpotEvent {

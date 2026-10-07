@@ -7,9 +7,10 @@ export function readEnvFile(path) {
   for (const line of fs.readFileSync(path, 'utf8').split(/\r?\n/)) {
     const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
     if (!m) continue;
-    let v = m[2].trim();
-    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
-    out[m[1]] = v;
+    const raw = m[2].trim();
+    // A quoted value ends at its closing quote; anything after it (a note or comment) is ignored.
+    const quoted = raw.match(/^"([^"]*)"|^'([^']*)'/);
+    out[m[1]] = quoted ? (quoted[1] ?? quoted[2]) : raw.replace(/\s+#.*$/, '');
   }
   return out;
 }

@@ -14,11 +14,13 @@ const total = (s: DrainStats) => s.done + s.skipped + s.requeued + s.failed + s.
 
 export async function POST(request: Request): Promise<Response> {
   if (!hasBearer(request, env('DRAIN_SECRET'))) {
+    log('drain_rejected');
     return new Response('unauthorized', { status: 401 });
   }
 
   const deps = syncDeps();
-  const deadline = Date.now() + 50_000;
+  // Leaves ~25 s of maxDuration for the row in progress (HubSpot calls retry within ~10 s each).
+  const deadline = Date.now() + 35_000;
   waitUntil(
     (async () => {
       const outbox = await drainOutbox(deps, deadline);

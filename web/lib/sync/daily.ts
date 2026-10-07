@@ -1,17 +1,20 @@
-// Daily job (ARCHITECTURE §10): sweep queues, catch missed updates and deletes, prune.
+// Daily job (ARCHITECTURE §10): prune, sweep queues, catch missed updates and deletes.
+// One bad contact is counted and logged, never allowed to stop the run.
 import { CONTACT_MODIFIED, OWNED_PROPERTIES, type HubSpotContact } from '../hubspot';
+import { log } from '../log';
 import { drainInbox, drainOutbox } from './drain';
-import { applyArgs, refreshContact, type SyncDeps } from './inbound';
+import { applyContact, refreshContact, type SyncDeps } from './inbound';
 
 const WINDOW_MS = 48 * 60 * 60 * 1000;
 const PAGE = 100;
 
 export interface DailyStats {
+  pruned: unknown;
   recentContacts: number;
   recentApplied: Record<string, number>;
   checkedLinked: number;
   missingResolved: Record<string, number>;
-  pruned: unknown;
+  errors: number;
   timedOut: boolean;
 }
 
@@ -22,16 +25,27 @@ interface SearchPage {
 
 export async function runDaily(deps: SyncDeps, deadline: number, now = Date.now()): Promise<DailyStats> {
   const stats: DailyStats = {
-    recentContacts: 0, recentApplied: {}, checkedLinked: 0, missingResolved: {}, pruned: null, timedOut: false,
+    pruned: null, recentContacts: 0, recentApplied: {}, checkedLinked: 0, missingResolved: {}, errors: 0, timedOut: false,
   };
   const bump = (m: Record<string, number>, k: string) => (m[k] = (m[k] ?? 0) + 1);
   const outOfTime = () => (Date.now() >= deadline ? ((stats.timedOut = true), true) : false);
+  const guarded = async (contactId: string, step: string, fn: () => Promise<string>, into: Record<string, number>) => {
+    try {
+      bump(into, await fn());
+    } catch (err) {
+      stats.errors++;
+      log('daily_contact_failed', { step, contactId, error: (err as Error).message });
+    }
+  };
 
-  // 1. Retry anything due (the per-minute drain normally gets there first).
+  // 1. Retention first: cheap, and must not be skipped by a later timeout.
+  stats.pruned = await deps.db.rpc('prune_old_rows');
+
+  // 2. Retry anything due (the per-minute drain normally gets there first).
   await drainOutbox(deps, deadline);
   await drainInbox(deps, deadline);
 
-  // 2. Missed updates: contacts modified in the last 48 h. This path ignores changeSource on purpose.
+  // 3. Missed updates: contacts modified in the last 48 h. This path ignores changeSource on purpose.
   let after: string | undefined;
   do {
     if (outOfTime()) return stats;
@@ -43,14 +57,13 @@ export async function runDaily(deps: SyncDeps, deadline: number, now = Date.now(
       ...(after ? { after } : {}),
     });
     for (const c of page.results) {
-      const outcome = await deps.db.rpc<string>('apply_hubspot_contact', applyArgs(c));
       stats.recentContacts++;
-      bump(stats.recentApplied, outcome);
+      await guarded(c.id, 'recent', () => applyContact(c, deps), stats.recentApplied);
     }
     after = page.paging?.next?.after;
   } while (after);
 
-  // 3. Missed deletes and merges: every linked contact must still exist under its ID.
+  // 4. Missed deletes and merges: every linked contact must still exist under its ID.
   let lastId = 0;
   for (;;) {
     if (outOfTime()) return stats;
@@ -65,11 +78,8 @@ export async function runDaily(deps: SyncDeps, deadline: number, now = Date.now(
     const present = new Set(found.results.map((r) => r.id));
     for (const id of ids.filter((id) => !present.has(String(id)))) {
       // A single GET resolves it: 404 -> soft delete, different id -> merge.
-      bump(stats.missingResolved, await refreshContact(String(id), deps));
+      await guarded(String(id), 'missing', () => refreshContact(String(id), deps), stats.missingResolved);
     }
   }
-
-  // 4. Retention.
-  stats.pruned = await deps.db.rpc('prune_old_rows');
   return stats;
 }

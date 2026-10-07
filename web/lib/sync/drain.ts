@@ -35,12 +35,19 @@ async function drain<T extends { id: number }>(
   const stats: DrainStats = { done: 0, skipped: 0, requeued: 0, failed: 0, dead: 0 };
   const direction = queue === 'inbox' ? 'inbound' : 'outbound';
 
-  // Claim only while there is time left; claimed rows are always finished or failed below.
+  // Claim only while there is time left. Every claimed row is finished, failed, or released.
   while (Date.now() < deadline) {
     const rows = await deps.db.rpc<T[]>(claimFn, { p_limit: BATCH });
     if (!rows?.length) break;
 
-    for (const row of rows) {
+    for (const [i, row] of rows.entries()) {
+      if (Date.now() >= deadline) {
+        // Out of time: hand unstarted rows back now instead of leaving them stuck for 5 minutes.
+        const unstarted = rows.slice(i).map((r) => r.id);
+        await deps.db.rpc('release_jobs', { p_queue: queue, p_ids: unstarted });
+        log('jobs_released', { queue, count: unstarted.length });
+        return stats;
+      }
       try {
         const result = await process(row);
         if (result.status !== 'requeued') {

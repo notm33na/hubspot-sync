@@ -6,7 +6,7 @@ import { submitForm, validateForm } from '@/lib/form';
 import { log } from '@/lib/log';
 import { syncDeps } from '@/lib/sync/deps';
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const PER_IP_PER_HOUR = 5;
 const SITE_PER_DAY = 200;

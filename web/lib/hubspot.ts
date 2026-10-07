@@ -44,7 +44,7 @@ export function createHubSpotClient(opts: {
           body: body === undefined ? undefined : JSON.stringify(body),
         });
       } catch (err) {
-        lastError = new HubSpotError(0, `network error: ${(err as Error).message}`, false);
+        lastError = new HubSpotError(0, `${method} ${path.split('?')[0]}: network error: ${(err as Error).message}`, false);
         await sleep(backoffMs(attempt));
         continue;
       }
@@ -53,9 +53,10 @@ export function createHubSpotClient(opts: {
         return (res.status === 204 ? undefined : await res.json()) as T;
       }
 
-      const message = await errorMessage(res);
+      const message = `${method} ${path.split('?')[0]}: ${await errorMessage(res)}`;
       if (res.status === 429) {
-        const waitMs = Number(res.headers.get('retry-after') ?? '1') * 1000;
+        const seconds = Number(res.headers.get('retry-after'));
+        const waitMs = (Number.isFinite(seconds) && seconds > 0 ? seconds : 1) * 1000;
         lastError = new HubSpotError(429, `rate limited: ${message}`, false);
         if (waitMs > MAX_INLINE_WAIT_MS) break;
         await sleep(waitMs);
@@ -88,6 +89,12 @@ async function errorMessage(res: Response): Promise<string> {
 // ------------------------------------------------------------------ contacts
 
 export const OWNED_PROPERTIES = ['email', 'firstname', 'lastname', 'phone', 'lifecyclestage'] as const;
+
+/** Only fictional demo contacts are ever stored in Supabase (PRD §2). */
+export const DEMO_EMAIL_DOMAIN = '@example.com';
+export function isDemoEmail(email: string | null | undefined): boolean {
+  return !!email && email.toLowerCase().endsWith(DEMO_EMAIL_DOMAIN);
+}
 
 export interface HubSpotContact {
   id: string;

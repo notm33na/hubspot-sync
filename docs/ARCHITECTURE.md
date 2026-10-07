@@ -68,6 +68,8 @@ HubSpot custom contact properties, created by an idempotent setup script (create
 - **Echo rule:** drop an event with `changeSource = INTEGRATION` and `sourceId = HUBSPOT_APP_ID`.
   This is safe because of the **writer-records rule**: any code that writes a HubSpot-owned field with our token
   (the form, `link_contact`) writes the same result to Supabase in the same handler. The echo carries nothing new.
+- **Demo data only:** a fetched contact whose email is not `@example.com` is never stored; if it is already
+  known, it goes through the delete path (personal data cleared). The daily job applies the same rule.
 - **Create, property change, restore:** do not trust the event's value or order. `GET` the contact's owned
   properties plus `lastmodifieddate` (contacts have no `hs_lastmodifieddate`), then upsert. Match on `hubspot_contact_id` first, then on `email` where
   `hubspot_contact_id IS NULL` (this links instead of inserting). The write is guarded in SQL:
@@ -77,7 +79,7 @@ HubSpot custom contact properties, created by an idempotent setup script (create
   If another customer already holds that ID, move its orders to the survivor (`UPDATE orders SET customer_id = …`),
   soft-delete the duplicate, and enqueue a `rollup` for the survivor.
 - **Delete, privacy delete, or `GET` returns 404:** set `deleted_at`, null `email`, `first_name`, `last_name`, `phone`.
-  Orders stay.
+  Orders stay. The delete also moves `hs_last_modified` forward, so a fetch that was already in flight cannot undo it.
 
 The spike showed that property events on creation are unreliable, which is why processing always fetches current state.
 

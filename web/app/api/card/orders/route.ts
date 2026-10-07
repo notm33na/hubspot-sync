@@ -42,11 +42,17 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   // Ask for one extra row to know whether a next page exists.
-  const rows = await db().rpc<OrderRow[]>('orders_for_contact', {
-    p_contact_id: contactId,
-    p_limit: PAGE_SIZE + 1,
-    p_offset: page * PAGE_SIZE,
-  });
+  let rows: OrderRow[];
+  try {
+    rows = await db().rpc<OrderRow[]>('orders_for_contact', {
+      p_contact_id: contactId,
+      p_limit: PAGE_SIZE + 1,
+      p_offset: page * PAGE_SIZE,
+    });
+  } catch (err) {
+    log('card_failed', { contactId, error: (err as Error).message });
+    return Response.json({ error: 'order service unavailable' }, { status: 502 });
+  }
 
   log('card_orders', { contactId, page, count: Math.min(rows.length, PAGE_SIZE) });
   return Response.json({

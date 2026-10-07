@@ -32,9 +32,27 @@ describe('runDaily', () => {
     expect(searchBody.filterGroups[0].filters[0].value).toBe(String(Date.parse('2026-10-05T12:00:00Z')));
   });
 
-  it('stops cleanly when out of time', async () => {
-    const { db } = fakeDb({ claim_outbox: [], claim_inbox: [] });
+  it('isolates a failing contact, keeps going, and filters non-demo contacts', async () => {
+    let calls = 0;
+    const { db, rpc } = fakeDb({
+      claim_outbox: [], claim_inbox: [], prune_old_rows: {}, apply_hubspot_delete: 'unknown',
+      apply_hubspot_contact: () => {
+        if (calls++ === 0) throw Object.assign(new Error('duplicate key value violates unique constraint'), { permanent: true });
+        return 'updated';
+      },
+    });
+    const request = vi.fn(async (_m: string, path: string) => path.endsWith('/search')
+      ? { results: [contact('1'), contact('2'), contact('3', { email: 'boss@realcompany.test' })] }
+      : { results: [] }) as unknown as RequestFn;
+    const stats = await runDaily(deps(db, request), Date.now() + 60_000);
+    expect(stats).toMatchObject({ recentContacts: 3, errors: 1, recentApplied: { updated: 1, 'ignored (not demo data)': 1 } });
+    expect(rpc).toHaveBeenCalledWith('apply_hubspot_delete', { p_contact_id: 3 });
+  });
+
+  it('prunes even when out of time', async () => {
+    const { db, rpc } = fakeDb({ claim_outbox: [], claim_inbox: [], prune_old_rows: {} });
     const stats = await runDaily(deps(db, vi.fn() as unknown as RequestFn), Date.now() - 1);
     expect(stats.timedOut).toBe(true);
+    expect(rpc).toHaveBeenCalledWith('prune_old_rows');
   });
 });

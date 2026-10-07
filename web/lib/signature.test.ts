@@ -10,8 +10,8 @@ const headers = (sig: string, ts = String(now)) =>
 
 describe('verifyHubSpotV3', () => {
   // HubSpot signs the decoded URI (%40 -> @), as observed in the spike.
-  const signedUri = 'https://x.vercel.app/api/card/orders?contactId=1&userEmail=a@b.com';
-  const requestUrl = 'https://x.vercel.app/api/card/orders?contactId=1&userEmail=a%40b.com';
+  const signedUri = 'https://x.vercel.app/api/card/orders?contactId=1&userEmail=a@example.org';
+  const requestUrl = 'https://x.vercel.app/api/card/orders?contactId=1&userEmail=a%40example.org';
   const getSig = sign(`GET${signedUri}${now}`);
 
   it('accepts a valid GET with an encoded query', () => {

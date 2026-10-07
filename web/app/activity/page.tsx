@@ -1,11 +1,24 @@
 // Public, read-only sync activity (R11): IDs and outcomes only, never names or emails.
-import { db } from '@/lib/db';
+import { db, type SyncLogRow } from '@/lib/db';
+import { log } from '@/lib/log';
 
 export const dynamic = 'force-dynamic';
 
 export default async function Activity() {
   const store = db();
-  const [rows, dead] = await Promise.all([store.recentLog(50), store.rpc<number>('dead_job_count')]);
+  let rows: SyncLogRow[];
+  let dead: number;
+  try {
+    [rows, dead] = await Promise.all([store.recentLog(50), store.rpc<number>('dead_job_count')]);
+  } catch (err) {
+    log('activity_failed', { error: (err as Error).message });
+    return (
+      <main>
+        <h1>Sync activity</h1>
+        <p role="alert">The activity log is unavailable right now. Try again in a minute.</p>
+      </main>
+    );
+  }
 
   return (
     <main>

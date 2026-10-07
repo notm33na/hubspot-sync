@@ -1,7 +1,8 @@
 // Demo reset (R12, ARCHITECTURE §7 "Reset"): restore a known synthetic state.
-//   1. Supabase: delete all demo data (sync triggers paused) via demo_reset_supabase().
-//   2. HubSpot: archive deals named "Fernhill demo…" and contacts with @example.com emails ONLY.
-//   3. HubSpot: create the seed contacts; Supabase: seed them pre-linked with orders (roll-ups sync normally).
+//   1. HubSpot: archive deals named "Fernhill demo:…" and contacts with @example.com emails ONLY
+//      (each candidate re-checked in code, not just by the search filter).
+//   2. HubSpot: create the seed contacts.
+//   3. Supabase: delete all demo data (sync triggers paused), then seed pre-linked customers and orders.
 // Usage: node scripts/demo-reset.mjs --yes      (reads .env.local; never prints secrets)
 import { readEnvFile } from './lib/env-file.mjs';
 
@@ -41,14 +42,15 @@ async function rpc(fn, args = {}) {
   return json;
 }
 
-async function searchIds(objectType, filter) {
+// Search narrows the candidates; `keep` re-checks each one in code before anything is archived.
+async function searchIds(objectType, filter, property, keep) {
   const ids = [];
   let after;
   do {
     const page = await hubspot('POST', `/crm/v3/objects/${objectType}/search`, {
-      filterGroups: [{ filters: [filter] }], properties: ['hs_object_id'], limit: 100, ...(after ? { after } : {}),
+      filterGroups: [{ filters: [filter] }], properties: [property], limit: 100, ...(after ? { after } : {}),
     });
-    ids.push(...page.results.map((r) => r.id));
+    ids.push(...page.results.filter((r) => keep(r.properties[property] ?? '')).map((r) => r.id));
     after = page.paging?.next?.after;
   } while (after);
   return ids;
@@ -60,18 +62,19 @@ async function archive(objectType, ids) {
   }
 }
 
-// ------------------------------------------------------------- 1. Supabase
-const cleared = await rpc('demo_reset_supabase');
-console.log(`supabase: cleared ${cleared.customers} customers, ${cleared.orders} orders`);
+// Order (ARCHITECTURE §7): HubSpot cleanup and seed creation first; Supabase is only touched once
+// HubSpot has succeeded, so a failure cannot leave the database empty.
 
-// ------------------------------------------------------------- 2. HubSpot cleanup
-const dealIds = await searchIds('deals', { propertyName: 'dealname', operator: 'CONTAINS_TOKEN', value: 'Fernhill' });
+// ------------------------------------------------------------- 1. HubSpot cleanup
+const dealIds = await searchIds('deals', { propertyName: 'dealname', operator: 'CONTAINS_TOKEN', value: 'Fernhill' },
+  'dealname', (name) => name.startsWith('Fernhill demo:'));
 await archive('deals', dealIds);
-const contactIds = await searchIds('contacts', { propertyName: 'email', operator: 'CONTAINS_TOKEN', value: '*@example.com' });
+const contactIds = await searchIds('contacts', { propertyName: 'email', operator: 'CONTAINS_TOKEN', value: '*@example.com' },
+  'email', (email) => email.toLowerCase().endsWith('@example.com'));
 await archive('contacts', contactIds);
 console.log(`hubspot: archived ${dealIds.length} demo deals, ${contactIds.length} @example.com contacts`);
 
-// ------------------------------------------------------------- 3. Seed
+// ------------------------------------------------------------- 2. HubSpot seed contacts
 // Deterministic synthetic data (fictional people, @example.com only).
 const PEOPLE = [
   ['Avery', 'Lindqvist', 'customer'], ['Jordan', 'Okafor', 'customer'], ['Priya', 'Raman', 'customer'],
@@ -109,5 +112,8 @@ const customers = PEOPLE.map(([first, last, stage], i) => {
   };
 });
 
+// ------------------------------------------------------------- 3. Supabase
+const cleared = await rpc('demo_reset_supabase');
+console.log(`supabase: cleared ${cleared.customers} customers, ${cleared.orders} orders`);
 const seeded = await rpc('demo_seed', { p_customers: customers });
 console.log(`seeded: ${seeded.customers} customers with ${seeded.orders} orders (roll-ups now syncing to HubSpot)`);

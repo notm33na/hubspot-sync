@@ -74,14 +74,14 @@ describe('submitForm', () => {
     expect(r).toMatchObject({ dealId: 901 });
     expect(request).toHaveBeenCalledTimes(2);
     expect(request).toHaveBeenLastCalledWith('POST', '/crm/v3/objects/deals', expect.objectContaining({
-      properties: expect.objectContaining({ dealname: expect.stringContaining(`(ref ${dealRef(valid)})`) }),
+      properties: expect.objectContaining({ dealname: expect.stringContaining(`(ref ${dealRef(valid, 11)})`) }),
     }));
   });
 
   it('on resume, reuses a deal an earlier attempt created but never recorded', async () => {
     const { db } = fakeDb({ claim_form_submission: claim({ outcome: 'resume', contact_done: true, hubspot_contact_id: 500 }) });
     const request = vi.fn(async () => ({
-      results: [{ id: '777', properties: { dealname: `Fernhill demo: x (ref ${dealRef(valid)})` } }],
+      results: [{ id: '777', properties: { dealname: `Fernhill demo: x (ref ${dealRef(valid, 11)})` } }],
     })) as unknown as RequestFn;
     const r = await submitForm(valid, deps(db, request));
     expect(r).toMatchObject({ dealId: 777 });

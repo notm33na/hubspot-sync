@@ -34,7 +34,11 @@ export async function processInboxEvent(e: HubSpotEvent, deps: SyncDeps): Promis
   }
 
   if (kind === 'deletion' || kind === 'privacyDeletion') {
-    const outcome = await deps.db.rpc<string>('apply_hubspot_delete', { p_contact_id: e.objectId });
+    // Stamp with HubSpot's deletion time, so a restore that happened later still wins.
+    const outcome = await deps.db.rpc<string>('apply_hubspot_delete', {
+      p_contact_id: e.objectId,
+      ...(e.occurredAt ? { p_deleted_at: new Date(e.occurredAt).toISOString() } : {}),
+    });
     return { status: 'done', action: kind, outcome };
   }
 
@@ -58,6 +62,7 @@ export async function processInboxEvent(e: HubSpotEvent, deps: SyncDeps): Promis
 export async function refreshContact(id: string, deps: SyncDeps): Promise<string> {
   const contact = await getContact(deps.request, id);
   if (!contact) {
+    // 404: "gone as of now" is exactly what we observed, so the default (now) is the right stamp.
     return deps.db.rpc<string>('apply_hubspot_delete', { p_contact_id: Number(id) });
   }
   if (contact.id !== id) {
@@ -73,7 +78,11 @@ export async function refreshContact(id: string, deps: SyncDeps): Promise<string
  */
 export async function applyContact(contact: HubSpotContact, deps: SyncDeps): Promise<string> {
   if (!isDemoEmail(contact.properties.email)) {
-    const outcome = await deps.db.rpc<string>('apply_hubspot_delete', { p_contact_id: Number(contact.id) });
+    const modified = contact.properties[CONTACT_MODIFIED];
+    const outcome = await deps.db.rpc<string>('apply_hubspot_delete', {
+      p_contact_id: Number(contact.id),
+      ...(modified ? { p_deleted_at: modified } : {}),
+    });
     return outcome === 'deleted' ? 'cleared (not demo data)' : 'ignored (not demo data)';
   }
   return deps.db.rpc<string>('apply_hubspot_contact', applyArgs(contact));

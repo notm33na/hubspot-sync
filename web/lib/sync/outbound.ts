@@ -15,7 +15,8 @@ export class PermanentJobError extends Error {
   readonly permanent = true;
 }
 
-const MAX_LINK_WAIT_MS = 30 * 60 * 1000;
+// Safety net only: requeue_outbox already parks the roll-up as soon as its link job is dead.
+const MAX_LINK_WAIT_MS = 24 * 60 * 60 * 1000;
 
 export async function processOutboxJob(job: OutboxRow, deps: SyncDeps): Promise<JobResult> {
   return job.kind === 'rollup' ? rollup(job, deps) : linkContact(job, deps);
@@ -29,9 +30,10 @@ async function rollup(job: OutboxRow, deps: SyncDeps): Promise<JobResult> {
     // Not linked yet (link_contact still pending): wait without using up attempts, but not forever:
     // if linking itself is parked, this roll-up must surface as dead rather than loop silently.
     const ageMs = job.created_at ? Date.now() - Date.parse(job.created_at) : 0;
-    if (ageMs > MAX_LINK_WAIT_MS) throw new PermanentJobError('customer still not linked to HubSpot after 30 minutes');
+    if (ageMs > MAX_LINK_WAIT_MS) throw new PermanentJobError('customer still not linked to HubSpot after 24 hours');
+    // requeue_outbox has already set the final status ('pending', 'skipped' or 'dead').
     const outcome = await deps.db.rpc<string>('requeue_outbox', { p_id: job.id, p_delay_seconds: 60 });
-    return { status: 'requeued', action: 'rollup', outcome: `not linked yet, ${outcome}` };
+    return { status: 'requeued', action: 'rollup', outcome: outcome === 'dead' ? 'link failed, parked' : `not linked yet, ${outcome}` };
   }
 
   try {

@@ -191,6 +191,12 @@ update public.form_submissions set claimed_at = now() - interval '3 minutes', co
 select pg_temp.check(
   (select outcome = 'resume' and contact_done and hubspot_contact_id = 42 from public.claim_form_submission('k1', 'a@example.com')),
   'form: stale processing row resumes with step state');
+update public.form_submissions set status = 'failed', claimed_at = now() - interval '5 seconds' where dedupe_key = 'k1';
+select pg_temp.check((select outcome = 'in_progress' from public.claim_form_submission('k1', 'a@example.com')),
+  'form: a just-failed row waits out HubSpot search lag before resuming');
+update public.form_submissions set claimed_at = now() - interval '20 seconds' where dedupe_key = 'k1';
+select pg_temp.check((select outcome = 'resume' from public.claim_form_submission('k1', 'a@example.com')),
+  'form: a failed row resumes after 15 s');
 update public.form_submissions set status = 'done', deal_done = true, hubspot_deal_id = 7 where dedupe_key = 'k1';
 select pg_temp.check(
   (select outcome = 'done' and hubspot_deal_id = 7 from public.claim_form_submission('k1', 'a@example.com')),
@@ -285,6 +291,15 @@ select pg_temp.check(
   (select deleted_at is not null and email is null from public.customers where hubspot_contact_id = 9100),
   'late stale fetch does not restore personal data');
 
+-- Delete processed late (after a restore already happened in HubSpot) must not block that restore.
+select public.apply_hubspot_contact(9101, 'late@example.com', 'Late', 'Delete', null, 'lead', '2026-10-07T10:00Z');
+select public.apply_hubspot_delete(9101, '2026-10-07T10:05Z');   -- HubSpot deletion time (occurredAt)
+select pg_temp.check(
+  public.apply_hubspot_contact(9101, 'late@example.com', 'Late', 'Delete', null, 'lead', '2026-10-07T10:07Z') = 'updated',
+  'restore after a late-processed delete applies (delete stamped with HubSpot time)');
+select pg_temp.check((select deleted_at is null from public.customers where hubspot_contact_id = 9101),
+  'late-delete restore clears deleted_at');
+
 delete from public.sync_outbox;
 insert into public.sync_outbox (kind, customer_id) values ('rollup', '00000000-0000-0000-0000-00000000000a');
 select count(*) from public.claim_outbox(5);
@@ -292,6 +307,24 @@ select public.release_jobs('outbox', array(select id from public.sync_outbox));
 select pg_temp.check(
   (select status = 'pending' and attempts = 0 and claimed_at is null from public.sync_outbox),
   'release_jobs returns an unstarted row to pending without using an attempt');
+
+-- Two claimed rows for the same customer (e.g. a failed row and a pending one): one released, one skipped.
+delete from public.sync_outbox;
+insert into public.sync_outbox (kind, customer_id, status, attempts) values ('rollup', '00000000-0000-0000-0000-00000000000a', 'failed', 1);
+insert into public.sync_outbox (kind, customer_id) values ('rollup', '00000000-0000-0000-0000-00000000000a');
+select count(*) from public.claim_outbox(5);
+select public.release_jobs('outbox', array(select id from public.sync_outbox order by id));
+select pg_temp.check(
+  (select count(*) filter (where status = 'pending') = 1 and count(*) filter (where status = 'skipped') = 1 from public.sync_outbox),
+  'release_jobs: duplicate claimed rows release one and skip the other');
+
+-- A waiting rollup is parked only when its customer's link job is dead.
+delete from public.sync_outbox;
+insert into public.sync_outbox (kind, customer_id, status) values ('link_contact', '00000000-0000-0000-0000-00000000000a', 'dead');
+insert into public.sync_outbox (kind, customer_id, status) values ('rollup', '00000000-0000-0000-0000-00000000000a', 'processing');
+select pg_temp.check(
+  public.requeue_outbox((select id from public.sync_outbox where kind = 'rollup')) = 'dead',
+  'requeue parks a rollup whose link job is dead');
 
 -- ---------------------------------------------------------- drain signal
 delete from public.sync_outbox;

@@ -56,9 +56,12 @@ export function formDedupeKey(f: FormInput): string {
   return crypto.createHash('sha256').update(normalized).digest('hex');
 }
 
-/** Short single-token reference (letters and digits only, so HubSpot search treats it as one token). */
-export function dealRef(f: FormInput): string {
-  return 'FH' + formDedupeKey(f).slice(0, 12);
+/**
+ * Single-token reference (letters and digits only) unique to one submission row: an identical
+ * resubmission after the 24 h window gets a new row, so it can never match an older deal.
+ */
+export function dealRef(f: FormInput, submissionId: number): string {
+  return `FH${submissionId}X${formDedupeKey(f).slice(0, 8)}`;
 }
 
 async function findDealByRef(deps: SyncDeps, ref: string): Promise<number | null> {
@@ -93,7 +96,7 @@ export async function submitForm(f: FormInput, deps: SyncDeps): Promise<SubmitRe
   }
 
   const id = claim.submission_id;
-  const ref = dealRef(f);
+  const ref = dealRef(f, id);
   try {
     let contactId = claim.hubspot_contact_id;
     if (!claim.contact_done || contactId === null) {

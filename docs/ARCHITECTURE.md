@@ -129,6 +129,9 @@ and keeps them only briefly.
   key; a matching row created in the last 24 h is reused, and an older one is ignored. If the row is `processing`
   and `claimed_at` is under 2 min old, return 409 "in progress". A stale row is reclaimed and resumed. If the row
   is `done`, return the stored result.
+- **Lost deal IDs:** each deal name carries a per-submission ref (`FH<id>X<hash>`). A resumed submission
+  searches for it before creating a deal. Search lags writes by about 8 s (measured), so a failed row waits
+  15 s before it can resume.
 - **Steps, each resumable:** (1) find or create the contact by email (§9; no overwrite),
   then write the `customers` row (writer-records rule) and set `contact_done`; (2) create the deal with its contact
   association and set `deal_done`. A retry after a partial failure resumes from the first unfinished step.

@@ -81,11 +81,18 @@ describe('processInboxEvent (Flow A)', () => {
     expect(rpc).toHaveBeenCalledWith('apply_hubspot_contact', expect.objectContaining({ p_contact_id: 200 }));
   });
 
+  it('stamps a deletion event with HubSpot\'s occurredAt', async () => {
+    const { db, rpc } = fakeDb({ apply_hubspot_delete: 'deleted' });
+    await processInboxEvent(event({ subscriptionType: 'contact.deletion', occurredAt: Date.parse('2026-10-07T10:05:00Z') }),
+      deps(db, vi.fn() as unknown as RequestFn));
+    expect(rpc).toHaveBeenCalledWith('apply_hubspot_delete', { p_contact_id: 100, p_deleted_at: '2026-10-07T10:05:00.000Z' });
+  });
+
   it('handles deletion and merge events', async () => {
     const { db, rpc } = fakeDb({ apply_hubspot_delete: 'deleted', apply_hubspot_merge: 'merged', apply_hubspot_contact: 'updated' });
     const request = vi.fn(async () => contact('300')) as unknown as RequestFn;
     await processInboxEvent(event({ subscriptionType: 'contact.deletion' }), deps(db, request));
-    expect(rpc).toHaveBeenCalledWith('apply_hubspot_delete', { p_contact_id: 100 });
+    expect(rpc).toHaveBeenCalledWith('apply_hubspot_delete', expect.objectContaining({ p_contact_id: 100 }));
     await processInboxEvent(event({ subscriptionType: 'contact.merge', primaryObjectId: 300, mergedObjectIds: [100] }),
       deps(db, request));
     expect(rpc).toHaveBeenCalledWith('apply_hubspot_merge', { p_old_id: 100, p_new_id: 300 });
@@ -129,9 +136,15 @@ describe('processOutboxJob (Flow B)', () => {
     expect(rpc).toHaveBeenCalledWith('requeue_outbox', { p_id: 1, p_delay_seconds: 60 });
   });
 
-  it('parks a rollup that has waited over 30 minutes for a link', async () => {
+  it('reports a rollup parked because its link job is dead', async () => {
+    const { db } = fakeDb({ compute_rollup: rollup({ hubspot_contact_id: null }), requeue_outbox: 'dead' });
+    const r = await processOutboxJob(job('rollup'), deps(db, vi.fn() as unknown as RequestFn));
+    expect(r).toMatchObject({ status: 'requeued', outcome: 'link failed, parked' });
+  });
+
+  it('parks a rollup that has waited over 24 hours for a link (safety net)', async () => {
     const { db } = fakeDb({ compute_rollup: rollup({ hubspot_contact_id: null }), requeue_outbox: 'pending' });
-    const old = { ...job('rollup'), created_at: new Date(Date.now() - 31 * 60_000).toISOString() };
+    const old = { ...job('rollup'), created_at: new Date(Date.now() - 25 * 60 * 60_000).toISOString() };
     await expect(processOutboxJob(old, deps(db, vi.fn() as unknown as RequestFn)))
       .rejects.toMatchObject({ permanent: true, message: expect.stringContaining('not linked') });
   });

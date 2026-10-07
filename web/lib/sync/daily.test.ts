@@ -46,7 +46,8 @@ describe('runDaily', () => {
       : { results: [] }) as unknown as RequestFn;
     const stats = await runDaily(deps(db, request), Date.now() + 60_000);
     expect(stats).toMatchObject({ recentContacts: 3, errors: 1, recentApplied: { updated: 1, 'ignored (not demo data)': 1 } });
-    expect(rpc).toHaveBeenCalledWith('apply_hubspot_delete', { p_contact_id: 3 });
+    // Cleared with HubSpot's modification time, not the server clock.
+    expect(rpc).toHaveBeenCalledWith('apply_hubspot_delete', { p_contact_id: 3, p_deleted_at: '2026-10-07T10:00:00Z' });
   });
 
   it('prunes even when out of time', async () => {

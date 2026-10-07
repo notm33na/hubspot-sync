@@ -46,12 +46,29 @@ export interface SyncLogEntry {
   outcome: string;
 }
 
+export interface FormSubmissionUpdate {
+  status?: 'processing' | 'done' | 'failed';
+  contact_done?: boolean;
+  deal_done?: boolean;
+  hubspot_contact_id?: number;
+  hubspot_deal_id?: number;
+  last_error?: string | null;
+}
+
+export interface SyncLogRow extends SyncLogEntry {
+  at: string;
+}
+
 /** The operations the sync code needs; a fake implements this in tests. */
 export interface SyncDb {
   rpc<T = unknown>(fn: string, args?: Record<string, unknown>): Promise<T>;
   getCustomer(id: string): Promise<CustomerRow | null>;
   insertInboxEvents(rows: { dedupe_key: string; payload: HubSpotEvent }[]): Promise<number>;
   log(entry: SyncLogEntry): Promise<void>;
+  updateFormSubmission(id: number, fields: FormSubmissionUpdate): Promise<void>;
+  recentLog(limit: number): Promise<SyncLogRow[]>;
+  /** Linked, not-deleted HubSpot contact IDs above `after`, ascending (daily delete check). */
+  linkedContactIds(after: number, limit: number): Promise<number[]>;
 }
 
 /** Postgres integrity/data errors cannot succeed on retry. */
@@ -108,6 +125,31 @@ export function db(): SyncDb {
       // Best effort: a failed log line must never fail the sync itself.
       const { error } = await client.from('sync_log').insert(entry);
       if (error) console.log(JSON.stringify({ event: 'sync_log_failed', message: error.message }));
+    },
+    async updateFormSubmission(id, fields) {
+      const { error } = await client.from('form_submissions').update(fields).eq('id', id);
+      if (error) fail('update form submission', error);
+    },
+    async recentLog(limit) {
+      const { data, error } = await client
+        .from('sync_log')
+        .select('at, direction, object_id, action, outcome')
+        .order('id', { ascending: false })
+        .limit(limit);
+      if (error) fail('read sync log', error);
+      return (data ?? []) as SyncLogRow[];
+    },
+    async linkedContactIds(after, limit) {
+      const { data, error } = await client
+        .from('customers')
+        .select('hubspot_contact_id')
+        .not('hubspot_contact_id', 'is', null)
+        .is('deleted_at', null)
+        .gt('hubspot_contact_id', after)
+        .order('hubspot_contact_id')
+        .limit(limit);
+      if (error) fail('list linked contacts', error);
+      return (data ?? []).map((r) => Number(r.hubspot_contact_id));
     },
   };
   return cached;

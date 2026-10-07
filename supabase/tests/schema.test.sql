@@ -278,6 +278,8 @@ delete from public.sync_outbox;
 do $$
 declare v_before bigint;
 begin
+  -- A live project already has the real secrets; hide them inside this (rolled-back) transaction.
+  delete from vault.secrets where name in ('drain_url', 'drain_secret');
   select count(*) into v_before from net.http_request_queue;
   insert into public.sync_outbox (kind, customer_id) values ('rollup', '00000000-0000-0000-0000-00000000000b');
   perform pg_temp.check((select count(*) = v_before from net.http_request_queue),
@@ -297,6 +299,48 @@ end $$;
 select pg_temp.check(
   exists (select 1 from cron.job where jobname = 'drain-every-minute' and schedule = '* * * * *'),
   'pg_cron drain job scheduled every minute');
+
+-- ------------------------------------------------------------------ phase 3
+delete from public.sync_outbox;
+insert into public.customers (id, email, updated_by)
+values ('00000000-0000-0000-0000-0000000000c1', 'link.me@example.com', 'hubspot');
+insert into public.sync_outbox (kind, customer_id, status) values ('rollup', '00000000-0000-0000-0000-0000000000c1', 'processing');
+select public.link_customer('00000000-0000-0000-0000-0000000000c1', 7001);
+select pg_temp.check(
+  (select count(*) = 1 from public.sync_outbox where customer_id = '00000000-0000-0000-0000-0000000000c1'),
+  'link: no duplicate rollup while one is processing');
+delete from public.sync_outbox;
+select public.link_customer('00000000-0000-0000-0000-0000000000c1', 7001);
+select pg_temp.check(
+  (select count(*) = 1 from public.sync_outbox where customer_id = '00000000-0000-0000-0000-0000000000c1' and status = 'pending'),
+  'link: queues a rollup when none is active');
+
+insert into public.sync_outbox (kind, customer_id, status) values ('link_contact', '00000000-0000-0000-0000-0000000000c1', 'dead');
+select pg_temp.check(public.dead_job_count() >= 1, 'dead_job_count counts parked jobs');
+
+insert into public.sync_log (at, direction, action, outcome) values (now() - interval '40 days', 'system', 'old', 'x');
+select pg_temp.check((public.prune_old_rows()->>'sync_log')::int >= 1, 'prune removes old sync_log rows');
+select pg_temp.check(not exists (select 1 from public.sync_log where action = 'old'), 'prune: old row gone');
+
+-- Reset and seed (wipes all data, so this runs last).
+select pg_temp.check((public.demo_reset_supabase()->>'customers')::int >= 1, 'reset reports deleted customers');
+select pg_temp.check(
+  not exists (select 1 from public.customers) and not exists (select 1 from public.orders)
+  and not exists (select 1 from public.sync_outbox),
+  'reset leaves no customers, orders or queued work');
+-- The reset's pause is transaction-local; in real use the seed is a separate transaction.
+select set_config('app.sync_paused', '', true);
+select pg_temp.check(
+  (public.demo_seed('[{"hubspot_contact_id": 8001, "email": "seed@example.com", "first_name": "Sam",
+     "last_name": "Seed", "lifecycle_stage": "customer", "hs_last_modified": "2026-10-07T00:00:00Z",
+     "orders": [{"order_number": "S-1", "ordered_at": "2026-10-01T00:00:00Z", "total_cents": 1200, "status": "shipped"},
+                {"order_number": "S-2", "ordered_at": "2026-10-03T00:00:00Z", "total_cents": 800, "status": "delivered"}]}]'::jsonb)
+   ->>'orders')::int = 2,
+  'seed inserts customers and orders');
+select pg_temp.check(
+  (select count(*) = 1 from public.sync_outbox where kind = 'rollup')
+  and not exists (select 1 from public.sync_outbox where kind = 'link_contact'),
+  'seed queues one rollup per customer and no link work');
 
 \echo 'ALL SCHEMA TESTS PASSED'
 rollback;

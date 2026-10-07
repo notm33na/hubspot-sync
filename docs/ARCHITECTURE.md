@@ -69,7 +69,7 @@ HubSpot custom contact properties, created by an idempotent setup script (create
   This is safe because of the **writer-records rule**: any code that writes a HubSpot-owned field with our token
   (the form, `link_contact`) writes the same result to Supabase in the same handler. The echo carries nothing new.
 - **Create, property change, restore:** do not trust the event's value or order. `GET` the contact's owned
-  properties plus `hs_lastmodifieddate`, then upsert. Match on `hubspot_contact_id` first, then on `email` where
+  properties plus `lastmodifieddate` (contacts have no `hs_lastmodifieddate`), then upsert. Match on `hubspot_contact_id` first, then on `email` where
   `hubspot_contact_id IS NULL` (this links instead of inserting). The write is guarded in SQL:
   `… WHERE hs_last_modified IS NULL OR hs_last_modified < $new`, so parallel batches cannot regress a row.
   A restore also clears `deleted_at`. A true email conflict with another linked row becomes `dead`, with a clear error.
@@ -191,7 +191,7 @@ A gitleaks pre-commit hook and a GitHub Actions job (free) scan every commit.
 
 `/api/cron/daily` runs once a day:
 
-1. **Missed updates:** search contacts with `hs_lastmodifieddate` in the last 48 h and run each through the Flow A
+1. **Missed updates:** search contacts with `lastmodifieddate` in the last 48 h and run each through the Flow A
    fetch. The echo rule does not apply here, because this path ignores `changeSource`.
 2. **Missed deletes:** `batch/read` every linked `hubspot_contact_id`; any ID not returned goes through the delete
    path, and any returned with a different ID goes through the merge path.

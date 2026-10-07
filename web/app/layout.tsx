@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import './globals.css';
 
 export const metadata = {
   title: 'Fernhill Supply Co. — HubSpot sync demo',
@@ -8,11 +9,17 @@ export const metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body style={{ fontFamily: 'system-ui, sans-serif', margin: 0, padding: '24px 16px', maxWidth: 720, marginInline: 'auto', lineHeight: 1.5 }}>
-        <p role="note" style={{ background: '#fff4d6', padding: '8px 12px', borderRadius: 6 }}>
-          <strong>Fictional demo company.</strong> Fernhill Supply Co. does not exist. All data here is synthetic.
-        </p>
-        {children}
+      <body>
+        <div className="page">
+          <p role="note" className="note">
+            <strong>Fictional demo company.</strong> Fernhill Supply Co. does not exist. All data here is synthetic.
+          </p>
+          <nav aria-label="Main">
+            <a href="/">Request a quote</a>
+            <a href="/activity">Sync activity</a>
+          </nav>
+          {children}
+        </div>
       </body>
     </html>
   );

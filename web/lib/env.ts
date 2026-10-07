@@ -7,6 +7,8 @@ const NAMES = [
   'SUPABASE_URL',
   'SUPABASE_SECRET_KEY',
   'DRAIN_SECRET',
+  'CRON_SECRET',
+  'RATE_LIMIT_SALT',
 ] as const;
 
 export type EnvName = (typeof NAMES)[number];

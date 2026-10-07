@@ -94,7 +94,10 @@ export interface HubSpotContact {
   properties: Record<string, string | null>;
 }
 
-const CONTACT_PROPS = [...OWNED_PROPERTIES, 'hs_lastmodifieddate'].join(',');
+/** Contacts use `lastmodifieddate`; `hs_lastmodifieddate` does not exist on contacts (verified 2026-10-07). */
+export const CONTACT_MODIFIED = 'lastmodifieddate';
+
+const CONTACT_PROPS = [...OWNED_PROPERTIES, CONTACT_MODIFIED].join(',');
 
 /** Current state of a contact, or null if it no longer exists. */
 export async function getContact(request: RequestFn, id: string): Promise<HubSpotContact | null> {

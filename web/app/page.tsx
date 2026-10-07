@@ -1,12 +1,16 @@
+import { PRODUCTS } from '@/lib/form';
+import { DemoForm } from './DemoForm';
+
 export default function Home() {
+  const products = Object.entries(PRODUCTS).map(([id, p]) => ({ id, label: `${p.label} ($${p.unitPrice} each)` }));
   return (
     <main>
-      <h1>Fernhill Supply Co. — order sync demo</h1>
-      <p>
-        A portfolio demo of a Supabase database and a custom front-end integrated with HubSpot CRM:
-        two-way contact sync, order data on the HubSpot contact record, and a form that creates CRM records.
+      <h1>Request a quote</h1>
+      <p className="muted">
+        Submitting creates (or reuses) a contact and a deal in HubSpot. The contact then syncs to the Supabase
+        order database, and its orders appear on the HubSpot contact record.
       </p>
-      <p>The demo form arrives in the next build phase.</p>
+      <DemoForm products={products} />
     </main>
   );
 }

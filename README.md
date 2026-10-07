@@ -18,11 +18,16 @@ built entirely on free tiers (no paid plan, no credit card).
 | **A custom front-end** | A public quote form creates (or reuses) the HubSpot contact and creates an associated deal. Submitting twice never creates duplicates. |
 | **Visible operations** | A public activity page shows every sync event, including webhooks the integration deliberately ignored to prevent loops. |
 
-![Orders card on a HubSpot contact record, showing orders from the Supabase database](docs/images/orders-card.png)
-
-*The orders card on a HubSpot contact record (free HubSpot account), with data read live from Supabase.*
+| Orders card on a HubSpot contact record | Quote form on the custom front-end |
+|---|---|
+| ![Orders card on a HubSpot contact record, showing orders read live from the Supabase database](docs/images/orders-card.png) | ![Quote form that creates a HubSpot contact and deal](docs/images/quote-form.png) |
 
 Live demo: **https://fernhill-order-sync.vercel.app** (form) · **/activity** (sync log)
+
+### Demo video (90 seconds)
+
+<!-- Upload the video here on github.com: edit this file and drag the .mp4 onto this line. -->
+
 
 ## How it works
 

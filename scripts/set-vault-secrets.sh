@@ -6,17 +6,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-# Git Bash paths (/d/...) mean nothing to Node on Windows; convert when cygpath exists.
-NODE_ROOT="$(cygpath -m "$ROOT" 2>/dev/null || echo "$ROOT")"
+. "$ROOT/scripts/lib/read-env.sh"
 DRAIN_URL="${1:?usage: set-vault-secrets.sh <drain url>}"
-read_env() {
-  node --input-type=module -e "
-    const { pathToFileURL } = await import('node:url');
-    const { readEnvFile } = await import(pathToFileURL(process.argv[1]).href);
-    const v = readEnvFile(process.argv[2])[process.argv[3]];
-    if (!v) { console.error(process.argv[3] + ' missing from .env.local'); process.exit(1); }
-    process.stdout.write(v);" "$NODE_ROOT/scripts/lib/env-file.mjs" "$NODE_ROOT/.env.local" "$1"
-}
 SUPABASE_DB_URL="$(read_env SUPABASE_DB_URL)"
 DRAIN_SECRET="$(read_env DRAIN_SECRET)"
 export SUPABASE_DB_URL DRAIN_SECRET DRAIN_URL

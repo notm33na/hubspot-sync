@@ -1,0 +1,35 @@
+{
+  "uid": "fernhill_order_sync_app",
+  "type": "app",
+  "config": {
+    "description": "Portfolio demo for a fictional company (Fernhill Supply Co.): syncs contacts with a Supabase order database and shows orders on the contact record.",
+    "name": "Fernhill Order Sync (demo)",
+    "distribution": "private",
+    "auth": {
+      "type": "static",
+      "requiredScopes": [
+        "oauth",
+        "crm.objects.contacts.read",
+        "crm.objects.contacts.write",
+        "crm.objects.deals.read",
+        "crm.objects.deals.write",
+        "crm.schemas.contacts.write"
+      ],
+      "optionalScopes": [],
+      "conditionallyRequiredScopes": []
+    },
+    "permittedUrls": {
+      "fetch": [
+        "https://fernhill-order-sync.vercel.app/api/"
+      ],
+      "iframe": [],
+      "img": []
+    },
+    "support": {
+      "supportEmail": "support@example.com",
+      "documentationUrl": "https://fernhill-order-sync.vercel.app/",
+      "supportUrl": "https://fernhill-order-sync.vercel.app/",
+      "supportPhone": "+18005555555"
+    }
+  }
+}

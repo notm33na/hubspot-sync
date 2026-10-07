@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Stores drain_url and drain_secret in Supabase Vault (create or update). Values never printed.
+# Reads SUPABASE_DB_URL and DRAIN_SECRET from .env.local.
+# Usage: bash scripts/set-vault-secrets.sh https://<vercel-domain>/api/drain
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+DRAIN_URL="${1:?usage: set-vault-secrets.sh <drain url>}"
+set -a; . "$ROOT/.env.local"; set +a
+: "${SUPABASE_DB_URL:?SUPABASE_DB_URL missing}" "${DRAIN_SECRET:?DRAIN_SECRET missing}"
+export SUPABASE_DB_URL DRAIN_SECRET DRAIN_URL
+
+MSYS_NO_PATHCONV=1 docker run --rm -i -e SUPABASE_DB_URL -e DRAIN_SECRET -e DRAIN_URL supabase/postgres:17.11.0.004 \
+  sh -c 'psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -qtA -v url="$DRAIN_URL" -v secret="$DRAIN_SECRET"' <<'SQL'
+\o /dev/null
+select vault.update_secret(id, :'url')    from vault.secrets where name = 'drain_url';
+select vault.create_secret(:'url', 'drain_url')       where not exists (select 1 from vault.secrets where name = 'drain_url');
+select vault.update_secret(id, :'secret') from vault.secrets where name = 'drain_secret';
+select vault.create_secret(:'secret', 'drain_secret') where not exists (select 1 from vault.secrets where name = 'drain_secret');
+\o
+select 'vault secrets set: ' || count(*) from vault.secrets where name in ('drain_url', 'drain_secret');
+SQL

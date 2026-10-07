@@ -11,11 +11,13 @@ const envPath = path.join(root, '.env.local');
 const vc = path.join(process.env.APPDATA ?? '', 'npm/node_modules/vercel/dist/vc.js');
 
 let env = readEnvFile(envPath);
-if (!env.DRAIN_SECRET) {
-  appendEnv(envPath, 'DRAIN_SECRET', crypto.randomBytes(32).toString('base64url'));
-  env = readEnvFile(envPath);
-  console.log('DRAIN_SECRET: generated into .env.local');
+for (const name of ['DRAIN_SECRET', 'CRON_SECRET', 'RATE_LIMIT_SALT']) {
+  if (!env[name]) {
+    appendEnv(envPath, name, crypto.randomBytes(32).toString('base64url'));
+    console.log(`${name}: generated into .env.local`);
+  }
 }
+env = readEnvFile(envPath);
 
 // SUPABASE_URL is derivable from the pooler user name (postgres.<project-ref>).
 if (!env.SUPABASE_URL && env.SUPABASE_DB_URL) {
@@ -28,6 +30,8 @@ const VARS = [
   ['HUBSPOT_CLIENT_SECRET', true],
   ['SUPABASE_SECRET_KEY', true],
   ['DRAIN_SECRET', true],
+  ['CRON_SECRET', true],
+  ['RATE_LIMIT_SALT', true],
   ['HUBSPOT_APP_ID', false],
   ['HUBSPOT_PORTAL_ID', false],
   ['SUPABASE_URL', false],

@@ -1,6 +1,6 @@
 // Flow A — HubSpot -> Supabase (ARCHITECTURE §4).
 import type { HubSpotEvent, SyncDb } from '../db';
-import { getContact, type RequestFn } from '../hubspot';
+import { CONTACT_MODIFIED, getContact, type HubSpotContact, type RequestFn } from '../hubspot';
 
 export interface SyncDeps {
   db: SyncDb;
@@ -64,14 +64,24 @@ export async function refreshContact(id: string, deps: SyncDeps): Promise<string
     // HubSpot answered with the surviving record of a merge.
     await deps.db.rpc('apply_hubspot_merge', { p_old_id: Number(id), p_new_id: Number(contact.id) });
   }
+  return deps.db.rpc<string>('apply_hubspot_contact', applyArgs(contact));
+}
+
+/**
+ * Arguments for apply_hubspot_contact. HubSpot's own modification time drives the out-of-order guard,
+ * so it is required: falling back to the server clock would let a late, older event win.
+ */
+export function applyArgs(contact: HubSpotContact): Record<string, unknown> {
   const p = contact.properties;
-  return deps.db.rpc<string>('apply_hubspot_contact', {
+  const modified = p[CONTACT_MODIFIED];
+  if (!modified) throw new Error(`contact ${contact.id} has no ${CONTACT_MODIFIED}`);
+  return {
     p_contact_id: Number(contact.id),
     p_email: p.email ?? null,
     p_first_name: p.firstname ?? null,
     p_last_name: p.lastname ?? null,
     p_phone: p.phone ?? null,
     p_lifecycle_stage: p.lifecyclestage ?? null,
-    p_modified: p.hs_lastmodifieddate ?? new Date().toISOString(),
-  });
+    p_modified: modified,
+  };
 }

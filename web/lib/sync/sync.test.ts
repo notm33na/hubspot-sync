@@ -1,35 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CustomerRow, HubSpotEvent, SyncDb } from '../db';
+import type { HubSpotEvent } from '../db';
 import { HubSpotError, type RequestFn } from '../hubspot';
-import { dedupeKey, processInboxEvent, type SyncDeps } from './inbound';
+import { APP_ID, contact, deps, fakeDb } from '../testing/fakes';
+import { dedupeKey, processInboxEvent } from './inbound';
 import { processOutboxJob } from './outbound';
 import { drainOutbox } from './drain';
-
-const APP_ID = '56058178';
-
-function fakeDb(rpcResults: Record<string, unknown> = {}, customer: CustomerRow | null = null) {
-  const rpc = vi.fn(async (fn: string) => {
-    const r = rpcResults[fn];
-    return typeof r === 'function' ? (r as () => unknown)() : r;
-  });
-  const db: SyncDb = {
-    rpc: rpc as SyncDb['rpc'],
-    getCustomer: vi.fn(async () => customer),
-    insertInboxEvents: vi.fn(async () => 0),
-    log: vi.fn(async () => {}),
-  };
-  return { db, rpc };
-}
-
-function deps(db: SyncDb, request: RequestFn): SyncDeps {
-  return { db, request, appId: APP_ID };
-}
-
-const contact = (id: string, props: Record<string, string> = {}) => ({
-  id,
-  properties: { email: 'x@example.com', firstname: 'X', lastname: 'Y', phone: null, lifecyclestage: 'lead',
-    hs_lastmodifieddate: '2026-10-07T10:00:00Z', ...props },
-});
 
 const event = (e: Partial<HubSpotEvent>): HubSpotEvent => ({
   subscriptionType: 'object.propertyChange', objectTypeId: '0-1', objectId: 100,
@@ -70,6 +45,13 @@ describe('processInboxEvent (Flow A)', () => {
     expect(r).toMatchObject({ status: 'done', outcome: 'updated' });
     expect(rpc).toHaveBeenCalledWith('apply_hubspot_contact', expect.objectContaining({
       p_last_name: 'Fresh', p_modified: '2026-10-07T10:00:00Z' }));
+  });
+
+  it('refuses to apply a contact without HubSpot\'s modification time (no server-clock fallback)', async () => {
+    const { db, rpc } = fakeDb({ apply_hubspot_contact: 'updated' });
+    const request = vi.fn(async () => contact('100', { lastmodifieddate: null })) as unknown as RequestFn;
+    await expect(processInboxEvent(event({}), deps(db, request))).rejects.toThrow('has no lastmodifieddate');
+    expect(rpc).not.toHaveBeenCalledWith('apply_hubspot_contact', expect.anything());
   });
 
   it('treats a 404 on fetch as a delete', async () => {

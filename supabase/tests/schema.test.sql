@@ -43,6 +43,26 @@ select pg_temp.check(
     where relnamespace = 'public'::regnamespace and relkind = 'r'),
   'RLS enabled on every public table');
 
+-- The server role must be able to do everything the workers do (regression: 42501 on claim_outbox).
+do $$
+begin
+  set local role service_role;
+  insert into public.customers (id, email, updated_by)
+  values ('00000000-0000-0000-0000-0000000000ff', 'svc@example.com', 'app');          -- fires enqueue trigger
+  insert into public.orders (order_number, customer_id, ordered_at, total_cents, status)
+  values ('SVC-1', '00000000-0000-0000-0000-0000000000ff', now(), 100, 'shipped');    -- fires rollup trigger
+  perform public.claim_outbox(10);
+  perform public.claim_inbox(10);
+  perform * from public.compute_rollup('00000000-0000-0000-0000-0000000000ff');
+  perform public.hit_rate_limit('svc', 60, 5);
+  insert into public.sync_log (direction, action, outcome) values ('system', 'test', 'ok');
+  reset role;
+  perform pg_temp.check(true, 'service_role can run triggers, RPCs and writes');
+  delete from public.orders where order_number = 'SVC-1';
+  delete from public.sync_outbox where customer_id = '00000000-0000-0000-0000-0000000000ff';
+  delete from public.customers where id = '00000000-0000-0000-0000-0000000000ff';
+end $$;
+
 -- ------------------------------------------------------------- enqueue
 insert into public.customers (id, email, first_name, updated_by)
 values ('00000000-0000-0000-0000-00000000000a', 'app.made@example.com', 'App', 'app'),

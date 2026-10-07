@@ -1,0 +1,12 @@
+{
+  "uid": "fernhill_orders_card",
+  "type": "card",
+  "config": {
+    "name": "Orders (Fernhill demo)",
+    "location": "crm.record.tab",
+    "entrypoint": "/app/cards/OrdersCard.tsx",
+    "objectTypes": [
+      "contacts"
+    ]
+  }
+}

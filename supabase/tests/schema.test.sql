@@ -184,6 +184,75 @@ select pg_temp.check(
   and not public.hit_rate_limit('ip:abc', 3600, 2),
   'rate limit allows 2 then blocks');
 
+-- -------------------------------------------------------- sync functions
+delete from public.sync_outbox;
+-- Note: each action and its verification are separate statements (a statement sees its own start snapshot).
+select pg_temp.check(
+  public.apply_hubspot_contact(9001, 'new@example.com', 'New', 'Person', null, 'lead', '2026-10-01T10:00Z') = 'inserted',
+  'apply: unknown contact is inserted');
+select pg_temp.check((select updated_by = 'hubspot' from public.customers where hubspot_contact_id = 9001),
+  'apply: inserted row is hubspot-owned');
+select pg_temp.check(not exists (select 1 from public.sync_outbox), 'apply: insert enqueues nothing (R7)');
+select pg_temp.check(
+  public.apply_hubspot_contact(9001, 'new@example.com', 'Newer', 'Person', null, 'lead', '2026-10-01T11:00Z') = 'updated',
+  'apply: newer state updates');
+select pg_temp.check(
+  public.apply_hubspot_contact(9001, 'new@example.com', 'Older', 'Person', null, 'lead', '2026-10-01T09:00Z') = 'stale',
+  'apply: older state reports stale');
+select pg_temp.check((select first_name = 'Newer' from public.customers where hubspot_contact_id = 9001),
+  'apply: older state does not overwrite');
+select pg_temp.check(
+  public.apply_hubspot_contact(9002, 'APP.made@example.com', 'App', 'Linked', null, 'lead', '2026-10-01T10:00Z') = 'updated',
+  'apply: unlinked customer with same email is updated');
+select pg_temp.check(
+  (select hubspot_contact_id = 9002 from public.customers where id = '00000000-0000-0000-0000-00000000000a'),
+  'apply: ...and linked by email (case-insensitive)');
+select pg_temp.check(
+  exists (select 1 from public.sync_outbox where kind = 'rollup' and customer_id = '00000000-0000-0000-0000-00000000000a'),
+  'apply: linking queues a rollup');
+
+do $$
+begin
+  perform public.apply_hubspot_contact(9003, 'new@example.com', 'Dup', 'Email', null, 'lead', now());
+  perform pg_temp.check(false, 'apply: email held by another linked contact raises');
+exception when unique_violation then
+  perform pg_temp.check(true, 'apply: email held by another linked contact raises');
+end $$;
+
+select pg_temp.check(public.apply_hubspot_delete(9001) = 'deleted', 'delete: known contact reports deleted');
+select pg_temp.check(
+  (select deleted_at is not null and email is null and first_name is null
+     from public.customers where hubspot_contact_id = 9001),
+  'delete: soft-deletes and clears PII');
+select pg_temp.check(
+  public.apply_hubspot_contact(9001, 'back@example.com', 'Back', 'Again', null, 'lead', '2026-10-02T10:00Z') = 'updated',
+  'restore: later state applies');
+select pg_temp.check((select deleted_at is null from public.customers where hubspot_contact_id = 9001),
+  'restore: clears deleted_at');
+
+update public.customers set hubspot_contact_id = 9000 where id = '00000000-0000-0000-0000-00000000000b';
+delete from public.sync_outbox;
+select pg_temp.check(public.apply_hubspot_merge(9000, 9002) = 'merged', 'merge: reports merged');
+select pg_temp.check(
+  not exists (select 1 from public.orders where customer_id = '00000000-0000-0000-0000-00000000000b')
+  and (select deleted_at is not null and hubspot_contact_id is null
+         from public.customers where id = '00000000-0000-0000-0000-00000000000b'),
+  'merge: orders move to the survivor, duplicate is soft-deleted');
+select pg_temp.check(
+  exists (select 1 from public.sync_outbox where kind = 'rollup' and customer_id = '00000000-0000-0000-0000-00000000000a'),
+  'merge: survivor gets a rollup');
+select pg_temp.check(public.apply_hubspot_merge(9050, 9051) = 'unknown', 'merge: unknown contact is a no-op');
+
+update public.orders set status = 'cancelled' where order_number = 'T-1';
+select pg_temp.check(
+  (select total_orders = 3 and lifetime_value_cents = 5500 and hubspot_contact_id = 9002 and not is_deleted
+     from public.compute_rollup('00000000-0000-0000-0000-00000000000a')),
+  'rollup: counts non-cancelled orders and sums cents');
+select pg_temp.check(
+  (select count(*) = 2 from public.orders_for_contact(9002, 2, 0))
+  and (select count(*) = 2 from public.orders_for_contact(9002, 2, 2)),
+  'card query pages through all 4 orders');
+
 -- ---------------------------------------------------------- drain signal
 delete from public.sync_outbox;
 do $$

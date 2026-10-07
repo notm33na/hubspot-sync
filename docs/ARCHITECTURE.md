@@ -209,11 +209,14 @@ Keep-alive comes from `pg_cron` querying the database every minute, and from thi
 ```
 hubspot/   HubSpot project (app, card, webhooks) — platform 2026.09
 web/       Next.js app for Vercel (form, activity page, API routes)
-supabase/  SQL migrations (no secret values), seed and reset scripts
-docs/      PRD, architecture
+supabase/  SQL migrations (no secret values) and database behaviour tests
+scripts/   migrations runner (tracks applied files in private.schema_migrations), setup, demo reset
+docs/      PRD, architecture, demo script
 ```
 
-CLI quirks on Windows (the `&` in the repo path, `--force` on the first upload, log lines) go in the README.
+CLI quirks on Windows (the `&` in the repo path) are in the README. Other CLI notes: the first
+`hs project upload` to a new account needs `--force`, and `vercel logs` can drop later lines of a request,
+so the app logs one line per request.
 
 ## 12. Traceability
 

@@ -4,7 +4,7 @@ import type { CustomerRow, SyncDb } from '../db';
 import type { RequestFn } from '../hubspot';
 import type { SyncDeps } from '../sync/inbound';
 
-export const APP_ID = '56058178';
+export const APP_ID = '1234567';
 
 /** rpcResults: value, or function returning the value, per RPC name. */
 export function fakeDb(rpcResults: Record<string, unknown> = {}, customer: CustomerRow | null = null, linkedIds: number[] = []) {

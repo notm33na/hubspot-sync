@@ -6,3 +6,5 @@ dist/
 .next/
 *.tsbuildinfo
 next-env.d.ts
+.claude/
+!.env.example

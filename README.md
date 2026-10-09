@@ -69,6 +69,7 @@ flowchart LR
   exists, catching anything a missed webhook would have lost.
 
 Full design: [docs/PRD.md](docs/PRD.md) (requirements) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (design).
+Client handoff package (setup, runbook, ownership, QA; also as one PDF): [docs/handoff/](docs/handoff/README.md).
 
 ## Stays free
 

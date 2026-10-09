@@ -10,9 +10,8 @@ own and run it.
 | File | Contents |
 |---|---|
 | `Fernhill-Order-Sync-Handoff.pdf` | This whole package as one document |
-| `documents/` | The same documents as Markdown, with images |
 | `Fernhill-Order-Sync-Demo.mp4` | 90-second demo video |
-| `source/fernhill-order-sync-source.zip` | The complete source code: web app, HubSpot app, database migrations, scripts, tests |
+| `source/` | The complete source code: web app, HubSpot app, database migrations, scripts, tests. These documents are in it as editable Markdown, at `source/docs/handoff/`. |
 
 > **Fernhill Supply Co. is a fictional company.** The live deployment is a demonstration and holds only synthetic
 > data: generated names, `@example.com` email addresses and seeded orders.
@@ -34,7 +33,7 @@ own and run it.
 |---|---|
 | Live quote form | <https://fernhill-order-sync.vercel.app> |
 | Live sync activity page | <https://fernhill-order-sync.vercel.app/activity> |
-| Source code | `source/fernhill-order-sync-source.zip` in this delivery |
+| Source code | The `source/` folder in this delivery |
 | Demo video (90 seconds) | `Fernhill-Order-Sync-Demo.mp4` in this delivery |
 
 **Checked on 9 October 2026:** both live links above returned HTTP 200, and a gitleaks scan of the package (Markdown
@@ -43,5 +42,5 @@ and the PDF's text) found no secrets, tokens, real email addresses or personal d
 The package contains no passwords, tokens or keys. Where a secret is needed, the documents name it and say where it
 is kept, never its value.
 
-To rebuild the PDF after editing a document: `python docs/handoff/build/build_pdf.py` (in the source code) (needs pandoc, Chrome 131+
+To rebuild the PDF after editing a document: `python docs/handoff/build/build_pdf.py` from the `source/` folder (needs pandoc, Chrome 131+
 and the `pypdf` Python package).

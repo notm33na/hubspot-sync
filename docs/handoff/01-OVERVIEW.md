@@ -30,7 +30,7 @@ order history inside HubSpot, and contact changes made in HubSpot reach the data
 - Quote form: <https://fernhill-order-sync.vercel.app>
 - Sync activity: <https://fernhill-order-sync.vercel.app/activity>
 - Demo video (90 seconds): `Fernhill-Order-Sync-Demo.mp4`, included in this delivery
-- Source code: `source/fernhill-order-sync-source.zip`, included in this delivery
+- Source code: the `source/` folder, included in this delivery
 
 ## Screenshots
 

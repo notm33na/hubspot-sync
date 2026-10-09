@@ -35,8 +35,8 @@ on Windows).
 
 1. In your GitHub account, create a new **private** repository (for example `fernhill-order-sync`) with no
    README or licence, so it starts empty.
-2. Unzip `source/fernhill-order-sync-source.zip` from this delivery, then push it to that repository and turn on the
-   secret-scan hook:
+2. Copy the `source/` folder from this delivery to a working folder named `fernhill-order-sync`. Push it to that
+   repository and turn on the secret-scan hook:
    ```bash
    cd fernhill-order-sync
    git init -b main

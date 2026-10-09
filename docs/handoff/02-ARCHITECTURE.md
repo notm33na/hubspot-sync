@@ -1,8 +1,7 @@
 # 2. Architecture
 
 This section explains how the system works in plain language. A short technical appendix follows for developers;
-the full design is in the repository at [docs/ARCHITECTURE.md](../ARCHITECTURE.md) and the requirements at
-[docs/PRD.md](../PRD.md).
+the full design is in the source code at `docs/ARCHITECTURE.md`, and the requirements at `docs/PRD.md`.
 
 ## The big picture
 

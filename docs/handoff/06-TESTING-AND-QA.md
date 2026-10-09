@@ -52,7 +52,7 @@ commit, and a **live smoke test** against the real deployment.
 
 ## Live smoke test results
 
-Full evidence: [docs/SMOKE-TEST.md](../SMOKE-TEST.md).
+Full evidence, with timestamps: `docs/SMOKE-TEST.md` in the source code.
 
 ### Run 1: 9 October 2026, 04:20–04:25 UTC. **PASS (5 of 5 steps)**
 

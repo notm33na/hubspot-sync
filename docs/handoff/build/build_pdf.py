@@ -20,7 +20,6 @@ from pypdf import PdfReader, PdfWriter
 HANDOFF = Path(__file__).resolve().parents[1]
 REPO = HANDOFF.parents[1]
 OUT = HANDOFF / "Fernhill-Order-Sync-Handoff.pdf"
-BLOB = "https://github.com/notm33na/hubspot-sync/blob/main/"
 DOCS = sorted(p.name for p in HANDOFF.glob("0[1-9]-*.md"))
 VERSION, DATE = "1.0", "9 October 2026"
 MERMAID = "https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"
@@ -47,11 +46,10 @@ def to_html(md_name: str):
         doc = re.match(r"^(\d\d)-[A-Z0-9-]+\.md(?:#(.*))?$", url)
         if doc:
             return f'href="#d{doc.group(1)}-{doc.group(2)}"' if doc.group(2) else f'href="#doc-{doc.group(1)}"'
-        path, _, frag = url.partition("#")
-        rel = (HANDOFF / path).resolve().relative_to(REPO).as_posix()
-        return f'href="{BLOB}{rel}{"#" + frag if frag else ""}"'
+        return 'class="local"'  # a file outside the package: no link in the PDF
 
     out = re.sub(r'href="([^"]+)"', href, out)
+    out = re.sub(r'<a class="local">(.*?)</a>', r'', out, flags=re.S)
     out = re.sub(r'src="([^"]+)"', lambda m: m.group(0) if m.group(1).startswith("http")
                  else f'src="{(HANDOFF / m.group(1)).resolve().as_uri()}"', out)
     out = re.sub(r'<pre class="mermaid"><code>(.*?)</code></pre>', r'<pre class="mermaid">\1</pre>', out, flags=re.S)
@@ -92,7 +90,7 @@ def page(docs, pages, markers):
   <p class="subtitle">HubSpot ↔ Supabase order and contact integration</p>
   <div class="meta">Prepared by <strong>Media &amp; Software Manager</strong><br>
   Version {VERSION} · {DATE}<br>
-  Live: fernhill-order-sync.vercel.app · Source: github.com/notm33na/hubspot-sync</div>
+  Live demo: fernhill-order-sync.vercel.app</div>
   <div class="note"><strong>Demo notice.</strong> Fernhill Supply Co. is a fictional company. The live system holds only
   synthetic data: generated names, @example.com email addresses and seeded orders. This document contains no passwords,
   tokens or keys.</div>

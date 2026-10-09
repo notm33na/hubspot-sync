@@ -3,7 +3,16 @@
 **Prepared by Media & Software Manager** · Version 1.0 · 9 October 2026
 
 This package hands over the Fernhill Order Sync integration (HubSpot ↔ Supabase ↔ Vercel) to the team that will
-own and run it. It is also available as one PDF: [Fernhill-Order-Sync-Handoff.pdf](Fernhill-Order-Sync-Handoff.pdf).
+own and run it.
+
+**What is in the delivery**
+
+| File | Contents |
+|---|---|
+| `Fernhill-Order-Sync-Handoff.pdf` | This whole package as one document |
+| `documents/` | The same documents as Markdown, with images |
+| `Fernhill-Order-Sync-Demo.mp4` | 90-second demo video |
+| `source/fernhill-order-sync-source.zip` | The complete source code: web app, HubSpot app, database migrations, scripts, tests |
 
 > **Fernhill Supply Co. is a fictional company.** The live deployment is a demonstration and holds only synthetic
 > data: generated names, `@example.com` email addresses and seeded orders.
@@ -25,15 +34,14 @@ own and run it. It is also available as one PDF: [Fernhill-Order-Sync-Handoff.pd
 |---|---|
 | Live quote form | <https://fernhill-order-sync.vercel.app> |
 | Live sync activity page | <https://fernhill-order-sync.vercel.app/activity> |
-| Source code | <https://github.com/notm33na/hubspot-sync> |
-| Release v1.0.0 (PDF, documents, demo video) | <https://github.com/notm33na/hubspot-sync/releases/tag/v1.0.0> |
-| Demo video (90 seconds) | <https://github.com/notm33na/hubspot-sync/releases/download/v1.0.0/Fernhill-Order-Sync-Demo.mp4> |
+| Source code | `source/fernhill-order-sync-source.zip` in this delivery |
+| Demo video (90 seconds) | `Fernhill-Order-Sync-Demo.mp4` in this delivery |
 
-**Checked on 9 October 2026:** every link above returned HTTP 200, and a gitleaks scan of the package (Markdown
+**Checked on 9 October 2026:** both live links above returned HTTP 200, and a gitleaks scan of the package (Markdown
 and the PDF's text) found no secrets, tokens, real email addresses or personal data.
 
 The package contains no passwords, tokens or keys. Where a secret is needed, the documents name it and say where it
 is kept, never its value.
 
-To rebuild the PDF after editing a document: `python docs/handoff/build/build_pdf.py` (needs pandoc, Chrome 131+
+To rebuild the PDF after editing a document: `python docs/handoff/build/build_pdf.py` (in the source code) (needs pandoc, Chrome 131+
 and the `pypdf` Python package).

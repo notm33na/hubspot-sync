@@ -29,16 +29,16 @@ order history inside HubSpot, and contact changes made in HubSpot reach the data
 
 - Quote form: <https://fernhill-order-sync.vercel.app>
 - Sync activity: <https://fernhill-order-sync.vercel.app/activity>
-- Demo video (90 seconds): <https://github.com/notm33na/hubspot-sync/releases/download/v1.0.0/Fernhill-Order-Sync-Demo.mp4>
-- Source code: <https://github.com/notm33na/hubspot-sync>
+- Demo video (90 seconds): `Fernhill-Order-Sync-Demo.mp4`, included in this delivery
+- Source code: `source/fernhill-order-sync-source.zip`, included in this delivery
 
 ## Screenshots
 
-![Orders card on a HubSpot contact record, reading orders live from the database](../images/orders-card.png)
+![Orders card on a HubSpot contact record, reading orders live from the database](images/orders-card.png)
 
 *The Orders card on a HubSpot contact record.*
 
-![Quote form on the website that creates a HubSpot contact and deal](../images/quote-form.png)
+![Quote form on the website that creates a HubSpot contact and deal](images/quote-form.png)
 
 *The public quote form.*
 

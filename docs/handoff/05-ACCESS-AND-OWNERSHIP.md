@@ -1,15 +1,15 @@
 # 5. Access and ownership
 
 This is the inventory of every account, app, key and secret in the system. It gives **names and locations only,
-never values**. Today everything is owned by Media & Software Manager. The transfer checklist at the end moves it
-to the client.
+never values**. Today everything is owned by Media & Software Manager. The client takes ownership by deploying their own copy;
+the checklist at the end tracks it.
 
 ## Accounts and services
 
 | # | Item | Platform / plan | Identifier | Current owner | Holds |
 |---|---|---|---|---|---|
-| A1 | Source repository | GitHub (public, Free) | `notm33na/hubspot-sync` | Media & Software Manager | All code, documentation, CI workflows (`ci`, `secret-scan`). **No secrets**: the workflows need none. |
-| A2 | Hosting project | Vercel (Hobby) | Project `fernhill-order-sync`, address `fernhill-order-sync.vercel.app`, root directory `web` | Media & Software Manager's Vercel account | The web app, 9 environment variables (B1–B9), daily cron job, Git connection to A1 (auto-deploys `main`) |
+| A1 | Source code | Git repository (developer's GitHub account) | Delivered as `source/fernhill-order-sync-source.zip` | Media & Software Manager | All code, documentation, CI workflows (`ci`, `secret-scan`). **No secrets**: the workflows need none. |
+| A2 | Hosting project | Vercel (Hobby) | Project `fernhill-order-sync`, address `fernhill-order-sync.vercel.app`, root directory `web` | Media & Software Manager's Vercel account | The web app, 9 environment variables (B1–B9), daily cron job, Git connection to the developer's repository (auto-deploys `main`) |
 | A3 | Database project | Supabase (Free) | Project `fernhill-order-sync`, organisation `MSmanager`, region Northeast Asia (Seoul) | Media & Software Manager | All tables and data, Vault secrets (C1–C2), the per-minute scheduler job `drain-every-minute` |
 | A4 | CRM account | HubSpot (free CRM) | Account "media and software company" | Media & Software Manager | Demo contacts and deals, the app (A5), the property group *Demo order data* |
 | A5 | HubSpot app | HubSpot developer project (platform 2026.09) | Project `fernhill-order-sync`, app "Fernhill Order Sync (demo)" (private, static token), card "Orders (Fernhill demo)", webhook subscriptions | Lives inside A4 | Access token (B1), client secret (B2), app ID (B3) |
@@ -39,55 +39,55 @@ setup script adds the secret ones with Vercel's *Sensitive* flag.
 
 ## Transferring ownership
 
-Transfer in this order: **GitHub, then Supabase, then Vercel, then HubSpot**, and finish by rotating every secret.
-Each platform's owner must take part, because the receiving side accepts or initiates each transfer.
+**Recommended: a fresh deployment on the client's own accounts.** The live system holds only synthetic demo data, so
+there is nothing to migrate. The client follows the [Setup guide](03-SETUP-GUIDE.md) (about two hours) on their own
+GitHub, Supabase, Vercel and HubSpot accounts. Every secret is then created fresh by the client and never known to the
+developer. Once the client's deployment passes the smoke test, the developer decommissions the demo on an agreed date
+(see [Decommissioning the demo](#decommissioning-the-demo)).
 
-### GitHub repository (A1)
+### Source code (A1)
 
-1. The client creates (or chooses) the receiving GitHub account or organisation.
-2. Current owner: *Repository → Settings → General → Danger Zone → Transfer ownership*, then enter the client's
-   account. The client accepts by email.
-3. Issues, releases and Actions history move with the repository; GitHub redirects the old address.
-4. Client: run `git config core.hooksPath scripts/hooks` in their clone (see the [Setup guide](03-SETUP-GUIDE.md)).
+The source code is delivered as an archive, so nothing needs to be transferred out of the developer's account.
 
-### Supabase project (A3)
+1. The client creates a **private** repository in their own GitHub account or organisation.
+2. The client unzips `source/fernhill-order-sync-source.zip` and pushes it to that repository
+   ([Setup guide](03-SETUP-GUIDE.md), Step 1). The archive contains the code only: no git history and no credentials.
+3. GitHub Actions runs the `ci` and `secret-scan` workflows on the first push. They need no configuration or secrets.
+4. From then on, the client's repository is the source of truth.
 
-1. The client creates a Supabase organisation and invites the current owner as an **Owner** of it (both
-   organisations need a shared owner for the transfer).
-2. Current owner: *Project Settings → General → Transfer project*, then choose the client's organisation.
-3. The project keeps its data, address and Vault secrets.
-4. Remove the developer from the client's organisation once the secrets are rotated.
+### Supabase (A3) and Vercel (A2)
 
-### Vercel project (A2)
+The client creates new projects (Setup guide Steps 2, 3, 5 and 6). To keep the web address
+`fernhill-order-sync.vercel.app`, the developer deletes the demo Vercel project first, which frees the name. Otherwise
+the client picks a new address and updates the four references listed in Setup guide Step 3.
 
-1. The client creates a Vercel team (Vercel Pro for commercial use; see [Limitations](07-LIMITATIONS-AND-NEXT-STEPS.md))
-   and invites the current owner.
-2. Current owner: *Project → Settings → General → Transfer Project*, then choose the client's team. Deployments,
-   environment variables and domains move with the project.
-3. Client: *Settings → Git*. Reconnect the repository at its new GitHub location, root directory `web`.
-
-**Alternative:** if a transfer is not possible, the client creates a new Vercel project from the repository (Setup guide
-Steps 3 and 5). The web address then changes, so update the four address references listed in Setup guide Step 3
-and re-upload the HubSpot app.
+Both platforms can also move an existing project between accounts (Supabase: *Project Settings → General → Transfer
+project*; Vercel: *Project → Settings → General → Transfer Project*). That requires the developer and the client to be
+members of each other's organisation or team during the move. It brings nothing a fresh deployment lacks, so it is
+not the recommended route.
 
 ### HubSpot app (A4, A5)
 
-The app is defined entirely in the repository (`hubspot/`). A HubSpot project belongs to the account it is uploaded to.
+The app is defined entirely in the source code (`hubspot/`). A HubSpot project belongs to the account it is uploaded to,
+so the client uploads it into **their own HubSpot account** (Setup guide Step 4). That installs the app, creates the
+three properties and adds the card. Contacts and deals stay in whichever account they were created in.
 
-- **The client keeps using this HubSpot account:** add the client's people as Super admins, then remove the
-  developer's user and revoke their personal access key (D1).
-- **The client uses their own HubSpot account (recommended for real data):** follow Setup guide Step 4 in the
-  client's account. That uploads the project, installs the app, creates the properties and adds the card. Then put
-  the new `HUBSPOT_*` values into Vercel and redeploy. Contacts and deals stay in whichever account they were created in.
+### Decommissioning the demo
+
+After the client confirms their deployment works, the developer:
+
+1. Deletes the demo Vercel project (frees the address and stops the daily job).
+2. Deletes the demo Supabase project (removes all synthetic data and the Vault secrets).
+3. Uninstalls the demo app in the developer's HubSpot account and archives the demo contacts and deals.
+4. Deletes the local `.env.local` and confirms this in writing.
 
 ## Transfer checklist
 
-- [ ] GitHub repository transferred and accepted; client admins confirmed
-- [ ] Supabase project in the client's organisation; client is Owner
-- [ ] Vercel project in the client's team; Git connection points at the client's repository
-- [ ] HubSpot: app running in the client's chosen account; Orders card added to the contact record
-- [ ] **Every secret rotated by the client** (B1, B2, B5, B7, B8, B9, B10, C2), and Vercel redeployed
-- [ ] Developer access removed: GitHub collaborators, Supabase members, Vercel members, HubSpot users and keys (D1)
-- [ ] Developer's copy of `.env.local` deleted (confirmed in writing)
+- [ ] Source code pushed to the client's own private GitHub repository; both workflows pass
+- [ ] Supabase project created in the client's account; migrations applied; Vault secrets set
+- [ ] Vercel project created in the client's account, connected to the client's repository (root directory `web`)
+- [ ] HubSpot app uploaded and installed in the client's account; properties created; Orders card added
+- [ ] All secrets (B1–B10, C1–C2) created by the client and held only in the client's accounts
 - [ ] Smoke test passes on the client's setup (`node scripts/smoke-test.mjs --yes`)
 - [ ] `/activity` shows 0 parked jobs and a `daily` line from the client-owned deployment
+- [ ] Demo decommissioned by the developer on the agreed date, and `.env.local` deletion confirmed in writing

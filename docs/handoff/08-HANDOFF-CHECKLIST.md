@@ -29,8 +29,8 @@ the others need the client's own accounts.
 ## Ownership and documentation
 
 - [ ] Documents 1–7 and this checklist received, as Markdown and as the PDF.
-- [ ] Repository, Supabase, Vercel and HubSpot transferred, or deployed on client accounts ([Access and ownership](05-ACCESS-AND-OWNERSHIP.md)).
-- [ ] Every secret rotated by the client; developer access removed.
+- [ ] Deployed on the client's own GitHub, Supabase, Vercel and HubSpot accounts ([Access and ownership](05-ACCESS-AND-OWNERSHIP.md)).
+- [ ] All secrets created by the client; the demo deployment decommissioned on the agreed date.
 - [ ] The client has run `node scripts/smoke-test.mjs --yes` on their own setup.
 - [ ] Limitations and the upgrade roadmap read and accepted ([Limitations and next steps](07-LIMITATIONS-AND-NEXT-STEPS.md)).
 

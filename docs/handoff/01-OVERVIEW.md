@@ -34,11 +34,11 @@ order history inside HubSpot, and contact changes made in HubSpot reach the data
 
 ## Screenshots
 
-![Orders card on a HubSpot contact record, reading orders live from the database](images/orders-card.png)
+![Orders card on a HubSpot contact record, reading orders live from the database](../images/orders-card.png)
 
 *The Orders card on a HubSpot contact record.*
 
-![Quote form on the website that creates a HubSpot contact and deal](images/quote-form.png)
+![Quote form on the website that creates a HubSpot contact and deal](../images/quote-form.png)
 
 *The public quote form.*
 

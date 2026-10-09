@@ -124,7 +124,7 @@ describe('processOutboxJob (Flow B)', () => {
     const { db } = fakeDb({ compute_rollup: rollup({}) });
     const request = vi.fn(async () => ({})) as unknown as RequestFn;
     const r = await processOutboxJob(job('rollup'), deps(db, request));
-    expect(r.status).toBe('done');
+    expect(r).toMatchObject({ status: 'done', objectId: '55' });
     expect(request).toHaveBeenCalledWith('PATCH', '/crm/v3/objects/contacts/55', { properties: {
       demo_total_orders: '3', demo_lifetime_value: '123.45', demo_last_order_date: '2026-10-02' } });
   });
@@ -169,7 +169,7 @@ describe('processOutboxJob (Flow B)', () => {
     const { db, rpc } = fakeDb({ link_customer: null, apply_hubspot_contact: 'updated' }, customer);
     const request = vi.fn(async () => contact('77')) as unknown as RequestFn;
     const r = await processOutboxJob(job('link_contact'), deps(db, request));
-    expect(r.outcome).toBe('linked existing contact');
+    expect(r).toMatchObject({ outcome: 'linked existing contact', objectId: '77' });
     expect(rpc).toHaveBeenCalledWith('link_customer', { p_customer: 'c1', p_contact_id: 77 });
     expect(vi.mocked(request).mock.calls.every(([method]) => method === 'GET')).toBe(true);
   });
@@ -190,6 +190,9 @@ describe('drain', () => {
     expect(stats).toMatchObject({ done: 1, dead: 1 });
     expect(rpc).toHaveBeenCalledWith('finish_job', { p_queue: 'outbox', p_id: 1, p_status: 'done' });
     expect(rpc).toHaveBeenCalledWith('fail_job', expect.objectContaining({ p_id: 2, p_permanent: true }));
+    // Activity shows the HubSpot contact ID when the job knows it, the queue row's customer ID otherwise.
+    expect(db.log).toHaveBeenCalledWith({ direction: 'outbound', object_id: '5', action: 'rollup', outcome: '1 orders' });
+    expect(db.log).toHaveBeenCalledWith({ direction: 'outbound', object_id: 'b', action: 'error', outcome: 'dead' });
   });
 
   it('releases claimed rows it has no time left to start', async () => {

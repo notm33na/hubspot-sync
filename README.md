@@ -118,8 +118,8 @@ and free accounts on HubSpot, Supabase and Vercel.
 ## Tests
 
 ```bash
-cd web && npm test && npm run typecheck   # 51 unit tests: signatures, HubSpot client, sync, form, daily job, route auth
-bash supabase/tests/run.sh                # 71 database checks against Supabase's Postgres image (Docker)
+cd web && npm test && npm run typecheck   # 54 unit tests: signatures, HubSpot client, sync, form, daily job, routes
+bash supabase/tests/run.sh                # 77 database checks against Supabase's Postgres image (Docker)
 ```
 
 CI runs both on every push. Secrets are blocked by a gitleaks pre-commit hook
@@ -131,6 +131,7 @@ CI runs both on every push. Secrets are blocked by a gitleaks pre-commit hook
 |---|---|
 | Apply new migrations | `bash scripts/migrate.sh` (`--status` to preview) |
 | Reset the demo to its seed state | `node scripts/demo-reset.mjs --yes` |
+| Loop-safety smoke test on the live deployment ([results](docs/SMOKE-TEST.md)) | `node scripts/smoke-test.mjs --yes`, then reset |
 | Update the HubSpot app or card | from `hubspot/`: `hs project upload` |
 | Watch sync activity | `/activity` on the deployed site |
 

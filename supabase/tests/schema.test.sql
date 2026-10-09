@@ -257,6 +257,29 @@ select pg_temp.check(
 select pg_temp.check((select deleted_at is null from public.customers where hubspot_contact_id = 9001),
   'restore: clears deleted_at');
 
+-- A roll-up PATCH moves HubSpot's modification time without changing mirrored fields (SMOKE-TEST.md, obs. 3).
+-- now() is fixed inside this transaction, so updated_at is pinned to a marker value first.
+update public.customers set updated_at = '2000-01-01T00:00Z' where hubspot_contact_id = 9001;
+select pg_temp.check(
+  (select updated_at = '2000-01-01T00:00Z' from public.customers where hubspot_contact_id = 9001),
+  'touch: an update of updated_at alone keeps the given value');
+select pg_temp.check(
+  public.apply_hubspot_contact(9001, 'back@example.com', 'Back', 'Again', null, 'lead', now() + interval '3 minutes') = 'unchanged',
+  'apply: identical newer state reports unchanged');
+select pg_temp.check(
+  (select hs_last_modified = now() + interval '3 minutes' and updated_at = '2000-01-01T00:00Z'
+     from public.customers where hubspot_contact_id = 9001),
+  'apply: unchanged advances hs_last_modified, keeps updated_at');
+select pg_temp.check(
+  public.apply_hubspot_contact(9001, 'back@example.com', 'Between', 'Again', null, 'lead', now() + interval '2 minutes') = 'stale',
+  'apply: older intermediate state after unchanged is stale');
+select pg_temp.check(
+  public.apply_hubspot_contact(9001, 'back@example.com', 'Back', 'Again', '+12015550142', 'lead', now() + interval '4 minutes') = 'updated',
+  'apply: a real change after unchanged updates');
+select pg_temp.check(
+  (select phone = '+12015550142' and updated_at = now() from public.customers where hubspot_contact_id = 9001),
+  'apply: a real change stamps updated_at');
+
 update public.customers set hubspot_contact_id = 9000 where id = '00000000-0000-0000-0000-00000000000b';
 delete from public.sync_outbox;
 select pg_temp.check(public.apply_hubspot_merge(9000, 9002) = 'merged', 'merge: reports merged');

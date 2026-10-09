@@ -12,6 +12,8 @@ export interface JobResult {
   status: 'done' | 'skipped' | 'requeued';
   action: string;
   outcome: string;
+  /** For the activity log: the HubSpot contact ID, when the job knows it and the queue row does not. */
+  objectId?: string;
 }
 
 // eventId alone is not guaranteed unique, so it is combined with the fields a retry repeats unchanged.

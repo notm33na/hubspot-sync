@@ -1,6 +1,6 @@
 // HubSpot webhooks -> sync_inbox (ARCHITECTURE §4 "Ingest").
 import { waitUntil } from '@vercel/functions';
-import type { HubSpotEvent } from '@/lib/db';
+import type { HubSpotEvent, SyncLogEntry } from '@/lib/db';
 import { env } from '@/lib/env';
 import { log } from '@/lib/log';
 import { publicUrl, verifyHubSpotV3 } from '@/lib/signature';
@@ -33,8 +33,9 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const deps = syncDeps();
+  let inserted: number;
   try {
-    const inserted = await deps.db.insertInboxEvents(events.map((e) => ({ dedupe_key: dedupeKey(e), payload: e })));
+    inserted = await deps.db.insertInboxEvents(events.map((e) => ({ dedupe_key: dedupeKey(e), payload: e })));
     log('webhook_received', {
       count: events.length,
       inserted,
@@ -47,10 +48,23 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   // Respond inside HubSpot's 5 s timeout; process afterwards. The per-minute drain covers a cut-short run.
+  const duplicates = events.length - inserted;
   waitUntil(
-    drainInbox(deps, Date.now() + 35_000)
-      .then((stats) => log('webhook_drain', { ...stats }))
-      .catch((err) => log('webhook_drain_failed', { error: (err as Error).message })),
+    (async () => {
+      // Make de-duplication visible on /activity (a HubSpot retry, or a replayed request).
+      if (duplicates > 0) await deps.db.log(duplicateLogEntry(events, duplicates));
+      log('webhook_drain', { ...(await drainInbox(deps, Date.now() + 35_000)) });
+    })().catch((err) => log('webhook_drain_failed', { error: (err as Error).message })),
   );
   return new Response(null, { status: 204 });
+}
+
+function duplicateLogEntry(events: HubSpotEvent[], duplicates: number): SyncLogEntry {
+  const objects = new Set(events.map((e) => String(e.objectId)));
+  return {
+    direction: 'inbound',
+    object_id: objects.size === 1 ? [...objects][0] : null,
+    action: 'webhook',
+    outcome: `${duplicates} duplicate${duplicates === 1 ? '' : 's'} ignored`,
+  };
 }

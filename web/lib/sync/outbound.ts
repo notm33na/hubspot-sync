@@ -36,6 +36,7 @@ async function rollup(job: OutboxRow, deps: SyncDeps): Promise<JobResult> {
     return { status: 'requeued', action: 'rollup', outcome: outcome === 'dead' ? 'link failed, parked' : `not linked yet, ${outcome}` };
   }
 
+  const objectId = String(r.hubspot_contact_id);
   try {
     await deps.request('PATCH', `/crm/v3/objects/contacts/${r.hubspot_contact_id}`, {
       properties: {
@@ -47,17 +48,19 @@ async function rollup(job: OutboxRow, deps: SyncDeps): Promise<JobResult> {
   } catch (err) {
     // Contact gone in HubSpot: Flow A (or the daily check) will soft-delete the customer.
     if (err instanceof HubSpotError && err.status === 404) {
-      return { status: 'skipped', action: 'rollup', outcome: 'contact not found in HubSpot' };
+      return { status: 'skipped', action: 'rollup', outcome: 'contact not found in HubSpot', objectId };
     }
     throw err;
   }
-  return { status: 'done', action: 'rollup', outcome: `${r.total_orders} orders` };
+  return { status: 'done', action: 'rollup', outcome: `${r.total_orders} orders`, objectId };
 }
 
 async function linkContact(job: OutboxRow, deps: SyncDeps): Promise<JobResult> {
   const c = await deps.db.getCustomer(job.customer_id);
   if (!c || c.deleted_at) return { status: 'skipped', action: 'link_contact', outcome: 'customer missing or deleted' };
-  if (c.hubspot_contact_id !== null) return { status: 'skipped', action: 'link_contact', outcome: 'already linked' };
+  if (c.hubspot_contact_id !== null) {
+    return { status: 'skipped', action: 'link_contact', outcome: 'already linked', objectId: String(c.hubspot_contact_id) };
+  }
   if (!c.email) throw new PermanentJobError('customer has no email to link by');
   if (!isDemoEmail(c.email)) throw new PermanentJobError('customer email is outside the demo domain');
 
@@ -69,5 +72,7 @@ async function linkContact(job: OutboxRow, deps: SyncDeps): Promise<JobResult> {
   await deps.db.rpc('link_customer', { p_customer: c.id, p_contact_id: Number(contact.id) });
   // HubSpot now owns the identity fields: pull its values back.
   await refreshContact(contact.id, deps);
-  return { status: 'done', action: 'link_contact', outcome: created ? 'created contact' : 'linked existing contact' };
+  return {
+    status: 'done', action: 'link_contact', outcome: created ? 'created contact' : 'linked existing contact', objectId: contact.id,
+  };
 }

@@ -92,20 +92,30 @@ Dedupe key: `eventId:subscriptionId:objectId:propertyName:occurredAt`, enforced 
 `demo_last_order_date` now shows 2026-10-06 instead of 2026-10-04 because seed order dates are relative to the reset
 time.
 
-## Observations and proposed fixes (not applied)
+## Observations and fixes
+
+All four were fixed after this run (2026-10-09); the run above predates them.
 
 1. **A replayed webhook is invisible on `/activity`.** De-duplication shows up only as `inserted: 0` in Vercel logs,
    and the Vercel CLI streams those live only. *Proposal:* when `inserted < count`, write one `sync_log` row
    (`inbound`, `webhook`, `"N duplicate(s) ignored"`) so the idempotency guarantee is observable after the fact.
+   **Fixed:** `web/app/api/hubspot/webhook/route.ts`.
 2. **`/activity` mixes ID types.** Inbound rows show the HubSpot contact ID and outbound roll-ups show the Supabase
    customer UUID, so one contact's round trip cannot be followed. *Proposal:* log the HubSpot contact ID for roll-ups
    too (it is already returned by `compute_rollup`), or add both IDs.
+   **Fixed:** roll-up and link jobs report the HubSpot contact ID (`web/lib/sync/outbound.ts`, `drain.ts`).
 3. **Roll-ups move HubSpot's `lastmodifieddate` but not `customers.hs_last_modified`.** After step 3, HubSpot was at
    04:21:41 while the database stayed at 04:20:43. This is harmless: the next daily reconcile re-fetches the contact
    (modified in the last 48 h) and rewrites the identical row, with no HubSpot write and therefore no loop. It is
    avoidable churn. *Proposal:* skip the `UPDATE` in `apply_hubspot_contact` when every owned field is unchanged
    (advance only `hs_last_modified`).
+   **Fixed:** migration `20261009000010_unchanged_contact.sql`. An identical newer state advances only
+   `hs_last_modified` (still required by the out-of-order guard) and reports `unchanged`, and `updated_at` moves only
+   when data changes.
 4. **No repeatable smoke script.** Steps 2–4 were run with ad-hoc probes. *Proposal:* add `scripts/smoke-test.mjs`.
    It would take high-water marks, insert and later remove an order, replay the newest processed inbox row, and
    assert the counts above. The step-2 UI edit would stay a manual prompt, since only a UI or another app's token is a
    faithful non-echo source.
+   **Fixed:** `node scripts/smoke-test.mjs --yes`. It waits for the UI edit (`--skip-ui` skips step 1). It cleans up
+   by cancelling the smoke order rather than deleting it, so customers and orders are never hard-deleted outside the
+   demo reset. Run the reset afterwards.

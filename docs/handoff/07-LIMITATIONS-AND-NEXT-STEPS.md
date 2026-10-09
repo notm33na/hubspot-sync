@@ -35,14 +35,14 @@ These protect the demo. They must be changed deliberately when real customers ar
 | **Privacy and DPA** | Sign each vendor's Data Processing Addendum (HubSpot, Supabase, Vercel). Record the integration in your records of processing. Update the privacy notice for the website form. Set a retention policy for orders and for the `sync_log`; the current 30-day log pruning is a starting point. |
 | **Data region** | The demo database is in **Northeast Asia (Seoul)**, and Vercel functions run in Vercel's default region. For EU or UK customer data, create the Supabase project in an EU region and set the Vercel function region to match. Region cannot be changed after a Supabase project is created, so plan a migration. |
 | **Backups and recovery** | Turn on Supabase backups (Pro: daily; Point-in-Time Recovery as an add-on), and test a restore once. HubSpot remains the system of record for contacts; the database is the system of record for orders. |
-| **Access and security** | Use organisation-owned accounts (not personal ones) with 2-factor sign-in. Rotate all secrets at handover. Add a GitHub branch protection rule so that `main` requires passing CI. |
+| **Access and security** | Use organisation-owned accounts (not personal ones) with 2-factor sign-in. Rotate secrets on a schedule (see the runbook). Add a GitHub branch protection rule so that `main` requires passing CI. |
 | **Monitoring** | Add an alert when the parked-job count is above zero or the daily job reports errors (for example a small uptime or log-alert service), rather than relying on someone checking `/activity`. |
 
 ## Upgrade roadmap (prioritised)
 
 | Priority | Item | Why |
 |---|---|---|
-| **1. Before any real data** | Move to client-owned accounts and rotate all secrets ([Access and ownership](05-ACCESS-AND-OWNERSHIP.md)) | Ownership and security |
+| **1. Before any real data** | Deploy on client-owned accounts, with all secrets created by the client ([Access and ownership](05-ACCESS-AND-OWNERSHIP.md)) | Ownership and security |
 | **1** | Supabase Pro in the right region, with backups on | No pausing, recoverability, data residency |
 | **1** | Vercel Pro | Licence terms for commercial use |
 | **1** | Replace the `@example.com` rule and remove the demo reset | The demo safeguards would block or delete real data |

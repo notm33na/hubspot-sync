@@ -33,17 +33,22 @@ on Windows).
 
 ## Step 1: Get the code
 
-1. Copy the repository to your own GitHub account: accept a repository transfer (see
-   [Access and ownership](05-ACCESS-AND-OWNERSHIP.md)) or fork <https://github.com/notm33na/hubspot-sync>.
-2. Clone it, then turn on the secret-scan hook:
+1. In your GitHub account, create a new **private** repository (for example `fernhill-order-sync`) with no
+   README or licence, so it starts empty.
+2. Unzip `source/fernhill-order-sync-source.zip` from this delivery, then push it to that repository and turn on the
+   secret-scan hook:
    ```bash
-   git clone https://github.com/<your-account>/hubspot-sync.git
-   cd hubspot-sync
+   cd fernhill-order-sync
+   git init -b main
+   git add . && git commit -m "Fernhill Order Sync v1.0"
+   git remote add origin https://github.com/<your-account>/fernhill-order-sync.git
+   git push -u origin main
    git config core.hooksPath scripts/hooks
    ```
 3. Copy `.env.example` to `.env.local`. This file holds your secrets locally and is never committed.
 
-**Verify:** `git status` shows a clean tree and `.env.local` is not listed (it is ignored).
+**Verify:** `git status` shows a clean tree and `.env.local` is not listed (it is ignored). On GitHub, the *Actions*
+tab shows the `ci` and `secret-scan` workflows running.
 
 ## Step 2: Supabase (database)
 

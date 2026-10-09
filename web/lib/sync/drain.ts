@@ -54,7 +54,7 @@ async function drain<T extends { id: number }>(
           await deps.db.rpc('finish_job', { p_queue: queue, p_id: row.id, p_status: result.status });
         }
         stats[result.status]++;
-        await deps.db.log({ direction, object_id: objectId(row), action: result.action, outcome: result.outcome });
+        await deps.db.log({ direction, object_id: result.objectId ?? objectId(row), action: result.action, outcome: result.outcome });
       } catch (err) {
         const message = (err as Error).message ?? String(err);
         const permanent = (err as { permanent?: boolean }).permanent === true;

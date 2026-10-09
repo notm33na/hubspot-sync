@@ -75,6 +75,8 @@ HubSpot custom contact properties, created by an idempotent setup script (create
   `hubspot_contact_id IS NULL` (this links instead of inserting). The write is guarded in SQL:
   `… WHERE hs_last_modified IS NULL OR hs_last_modified < $new`, so parallel batches cannot regress a row.
   A restore also clears `deleted_at`. A true email conflict with another linked row becomes `dead`, with a clear error.
+  If every mirrored field already matches (a roll-up PATCH moves `lastmodifieddate` too), only `hs_last_modified`
+  advances and the outcome is `unchanged`; `updated_at` changes only when data does.
 - **Merge:** if `GET` returns a different `id` than the one requested, re-point the customer to the surviving ID.
   If another customer already holds that ID, move its orders to the survivor (`UPDATE orders SET customer_id = …`),
   soft-delete the duplicate, and enqueue a `rollup` for the survivor.
@@ -137,7 +139,9 @@ and keeps them only briefly.
   association and set `deal_done`. A retry after a partial failure resumes from the first unfinished step.
 
 **Activity (R11).** `/activity` is public and read-only. Server code selects `at, direction, object_id, action, outcome`
-from `sync_log` (limit 50) plus a count of `dead` rows. No names or emails.
+from `sync_log` (limit 50) plus a count of `dead` rows. No names or emails. `object_id` is the HubSpot contact ID
+wherever a job knows it (an outbound job that fails before reading its customer shows the customer UUID), and a
+webhook delivery whose events are already in the inbox logs `N duplicate(s) ignored`.
 
 **Reset (R12)** is the one exception to "never hard-delete" (PRD §5). `npm run demo:reset` disables the queue
 triggers, deletes synthetic orders and customers in Supabase, empties both queues, archives contacts with

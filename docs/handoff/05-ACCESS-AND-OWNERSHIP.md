@@ -8,7 +8,7 @@ the checklist at the end tracks it.
 
 | # | Item | Platform / plan | Identifier | Current owner | Holds |
 |---|---|---|---|---|---|
-| A1 | Source code | Git repository (developer's GitHub account) | Delivered as `source/fernhill-order-sync-source.zip` | Media & Software Manager | All code, documentation, CI workflows (`ci`, `secret-scan`). **No secrets**: the workflows need none. |
+| A1 | Source code | Git repository (developer's GitHub account) | Delivered as the `source/` folder | Media & Software Manager | All code, documentation, CI workflows (`ci`, `secret-scan`). **No secrets**: the workflows need none. |
 | A2 | Hosting project | Vercel (Hobby) | Project `fernhill-order-sync`, address `fernhill-order-sync.vercel.app`, root directory `web` | Media & Software Manager's Vercel account | The web app, 9 environment variables (B1–B9), daily cron job, Git connection to the developer's repository (auto-deploys `main`) |
 | A3 | Database project | Supabase (Free) | Project `fernhill-order-sync`, organisation `MSmanager`, region Northeast Asia (Seoul) | Media & Software Manager | All tables and data, Vault secrets (C1–C2), the per-minute scheduler job `drain-every-minute` |
 | A4 | CRM account | HubSpot (free CRM) | Account "media and software company" | Media & Software Manager | Demo contacts and deals, the app (A5), the property group *Demo order data* |
@@ -47,11 +47,11 @@ developer. Once the client's deployment passes the smoke test, the developer dec
 
 ### Source code (A1)
 
-The source code is delivered as an archive, so nothing needs to be transferred out of the developer's account.
+The source code is delivered as a plain folder, so nothing needs to be transferred out of the developer's account.
 
 1. The client creates a **private** repository in their own GitHub account or organisation.
-2. The client unzips `source/fernhill-order-sync-source.zip` and pushes it to that repository
-   ([Setup guide](03-SETUP-GUIDE.md), Step 1). The archive contains the code only: no git history and no credentials.
+2. The client pushes the `source/` folder to that repository ([Setup guide](03-SETUP-GUIDE.md), Step 1). It contains
+   the code only: no git history and no credentials.
 3. GitHub Actions runs the `ci` and `secret-scan` workflows on the first push. They need no configuration or secrets.
 4. From then on, the client's repository is the source of truth.
 

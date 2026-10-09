@@ -119,3 +119,18 @@ All four were fixed after this run (2026-10-09); the run above predates them.
    **Fixed:** `node scripts/smoke-test.mjs --yes`. It waits for the UI edit (`--skip-ui` skips step 1). It cleans up
    by cancelling the smoke order rather than deleting it, so customers and orders are never hard-deleted outside the
    demo reset. Run the reset afterwards.
+
+## Re-run after the fixes (2026-10-09, 04:42–04:45 UTC)
+
+Fixes deployed by Vercel's Git integration from commit `2a5f802` (production at 04:36:02), and migration
+`20261009000010_unchanged_contact.sql` applied to Supabase. Run with `node scripts/smoke-test.mjs --yes`.
+Avery's contact ID was `566851215042` after the first run's reset.
+
+**Result: PASS, all 16 checks.**
+
+| Step | Evidence |
+|---|---|
+| 1. HubSpot → DB | The operator changed the **last name** to `Lindqvista` in the HubSpot UI. Exactly one event arrived: inbox #172, `lastname`, `CRM_UI`, `done` (seen 04:44:21). `hs_last_modified` moved 04:24:35.576 → 04:44:11.28. `/activity` showed `04:44:15 inbound updated`. 0 outbound jobs and 0 roll-up history entries. |
+| 2. DB → HubSpot | Order `FH-SMOKE-1791521064841` was inserted at 04:44:25. Exactly one roll-up job ran (#265, `done`). `demo_total_orders 3 → 4`, `demo_lifetime_value 1080.29 → 1203.74`, `demo_last_order_date 2026-10-06 → 2026-10-09`, with one history entry each. No webhooks arrived for the contact in the 30 s echo window. `/activity` showed `04:44:28 outbound rollup "4 orders"` with object ID **`566851215042`**, the HubSpot contact ID (fix 2). Cancelling the order restored the roll-ups. |
+| 3. Idempotency | Inbox #172 was replayed at 04:45:05 and got **204**. No new inbox row was created and nothing was re-processed. `/activity` showed `04:45:05 inbound webhook "1 duplicate ignored"` (fix 1). The same request with a 10-minute-old signature got **401**. |
+| 5. Restore | `demo-reset.mjs --yes` ran 04:45:19 → 04:45:23. Checked at 04:45:29: Avery (new contact ID `566866673349`) is back to `Lindqvist` with the 4 seed orders, and the roll-ups (3, 1080.29) are synced. All roll-up jobs are `done`; 0 jobs are parked. |

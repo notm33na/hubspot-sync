@@ -24,6 +24,8 @@ built entirely on free tiers (no paid plan, no credit card).
 
 Live demo: **https://fernhill-order-sync.vercel.app** (form) · **/activity** (sync log)
 
+Built by **M&S Manager** · [case study and more builds](https://media-and-software-manager.vercel.app/automation.html#work)
+
 ### Demo video (90 seconds)
 
 <!-- Upload the video here on github.com: edit this file and drag the .mp4 onto this line. -->

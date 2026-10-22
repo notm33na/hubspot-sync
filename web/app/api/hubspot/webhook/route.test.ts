@@ -8,7 +8,10 @@ const WEBHOOK_URL = 'https://demo.test/api/hubspot/webhook';
 const pending: Promise<unknown>[] = [];
 let store = fakeDb();
 
-vi.mock('@vercel/functions', () => ({ waitUntil: (p: Promise<unknown>) => pending.push(p) }));
+vi.mock('@/lib/runtime', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/runtime')>()),
+  waitUntil: (p: Promise<unknown>) => pending.push(p),
+}));
 vi.mock('@/lib/sync/deps', () => ({ syncDeps: () => ({ db: store.db, request: vi.fn(), appId: '1' }) }));
 vi.mock('@/lib/sync/drain', () => ({ drainInbox: vi.fn(async () => ({ done: 0, skipped: 0, requeued: 0, failed: 0, dead: 0 })) }));
 

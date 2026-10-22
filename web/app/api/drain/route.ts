@@ -1,14 +1,12 @@
 // Called by Supabase (outbox trigger and per-minute pg_cron) with the Vault bearer secret (ARCHITECTURE §6).
 // Answers 202 at once and drains in the background: pg_net gives up after 5 s, and the caller needs
 // no result. Concurrent drains are safe because claiming uses SKIP LOCKED.
-import { waitUntil } from '@vercel/functions';
 import { env } from '@/lib/env';
 import { log } from '@/lib/log';
+import { BACKGROUND_DEADLINE_MS, waitUntil } from '@/lib/runtime';
 import { hasBearer } from '@/lib/signature';
 import { syncDeps } from '@/lib/sync/deps';
 import { drainInbox, drainOutbox, type DrainStats } from '@/lib/sync/drain';
-
-export const maxDuration = 60;
 
 const total = (s: DrainStats) => s.done + s.skipped + s.requeued + s.failed + s.dead;
 
@@ -19,8 +17,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const deps = syncDeps();
-  // Leaves ~25 s of maxDuration for the row in progress (HubSpot calls retry within ~10 s each).
-  const deadline = Date.now() + 35_000;
+  const deadline = Date.now() + BACKGROUND_DEADLINE_MS;
   waitUntil(
     (async () => {
       const outbox = await drainOutbox(deps, deadline);

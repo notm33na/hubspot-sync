@@ -1,11 +1,10 @@
-// Vercel cron, once a day (Hobby limit). Vercel sends `Authorization: Bearer $CRON_SECRET`.
+// Daily job, once a day at 06:00 UTC. The Worker's Cron Trigger (worker.ts `scheduled`) calls this handler
+// with `Authorization: Bearer $CRON_SECRET`; the same check guards manual HTTP calls.
 import { env } from '@/lib/env';
 import { log } from '@/lib/log';
 import { hasBearer } from '@/lib/signature';
 import { runDaily } from '@/lib/sync/daily';
 import { syncDeps } from '@/lib/sync/deps';
-
-export const maxDuration = 300;
 
 export async function GET(request: Request): Promise<Response> {
   if (!hasBearer(request, env('CRON_SECRET'))) {

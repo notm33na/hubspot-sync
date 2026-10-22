@@ -6,8 +6,6 @@ import { submitForm, validateForm } from '@/lib/form';
 import { log } from '@/lib/log';
 import { syncDeps } from '@/lib/sync/deps';
 
-export const maxDuration = 60;
-
 const PER_IP_PER_HOUR = 5;
 const SITE_PER_DAY = 200;
 
@@ -28,8 +26,10 @@ export async function POST(request: Request): Promise<Response> {
   const validation = validateForm(raw);
   if (!validation.ok) return Response.json({ errors: validation.errors }, { status: 400 });
 
-  // Rate limits: the IP is hashed with a secret salt and never stored raw.
-  const ip = (request.headers.get('x-forwarded-for') ?? '').split(',')[0].trim() || 'unknown';
+  // Rate limits: the IP is hashed with a secret salt and never stored raw. Cloudflare sets cf-connecting-ip
+  // (clients can't override it); x-forwarded-for is the fallback outside Cloudflare.
+  const ip = request.headers.get('cf-connecting-ip')?.trim()
+    || (request.headers.get('x-forwarded-for') ?? '').split(',')[0].trim() || 'unknown';
   const ipBucket = 'ip:' + crypto.createHash('sha256').update(ip + env('RATE_LIMIT_SALT')).digest('hex');
   const store = db();
   const ipOk = await store.rpc<boolean>('hit_rate_limit', { p_bucket: ipBucket, p_window_seconds: 3600, p_max: PER_IP_PER_HOUR });

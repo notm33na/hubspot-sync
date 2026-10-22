@@ -2,7 +2,7 @@
 # Stores drain_url and drain_secret in Supabase Vault (create or update). Values never printed.
 # Reads SUPABASE_DB_URL and DRAIN_SECRET from .env.local (parsed, not executed as shell).
 # Values reach psql only through environment variables, never on a command line.
-# Usage: bash scripts/set-vault-secrets.sh https://<vercel-domain>/api/drain
+# Usage: bash scripts/set-vault-secrets.sh https://<worker-domain>/api/drain
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

@@ -1,14 +1,12 @@
 // HubSpot webhooks -> sync_inbox (ARCHITECTURE §4 "Ingest").
-import { waitUntil } from '@vercel/functions';
 import type { HubSpotEvent, SyncLogEntry } from '@/lib/db';
 import { env } from '@/lib/env';
 import { log } from '@/lib/log';
+import { BACKGROUND_DEADLINE_MS, waitUntil } from '@/lib/runtime';
 import { publicUrl, verifyHubSpotV3 } from '@/lib/signature';
 import { syncDeps } from '@/lib/sync/deps';
 import { drainInbox } from '@/lib/sync/drain';
 import { dedupeKey } from '@/lib/sync/inbound';
-
-export const maxDuration = 60;
 
 export async function POST(request: Request): Promise<Response> {
   const rawBody = await request.text();
@@ -53,7 +51,7 @@ export async function POST(request: Request): Promise<Response> {
     (async () => {
       // Make de-duplication visible on /activity (a HubSpot retry, or a replayed request).
       if (duplicates > 0) await deps.db.log(duplicateLogEntry(events, duplicates));
-      log('webhook_drain', { ...(await drainInbox(deps, Date.now() + 35_000)) });
+      log('webhook_drain', { ...(await drainInbox(deps, Date.now() + BACKGROUND_DEADLINE_MS)) });
     })().catch((err) => log('webhook_drain_failed', { error: (err as Error).message })),
   );
   return new Response(null, { status: 204 });

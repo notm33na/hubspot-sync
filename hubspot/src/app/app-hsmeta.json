@@ -20,15 +20,15 @@
     },
     "permittedUrls": {
       "fetch": [
-        "https://fernhill-order-sync.vercel.app/api/"
+        "https://fernhill.mediaandsoftwaremanager.com/api/"
       ],
       "iframe": [],
       "img": []
     },
     "support": {
       "supportEmail": "support@example.com",
-      "documentationUrl": "https://fernhill-order-sync.vercel.app/",
-      "supportUrl": "https://fernhill-order-sync.vercel.app/",
+      "documentationUrl": "https://fernhill.mediaandsoftwaremanager.com/",
+      "supportUrl": "https://fernhill.mediaandsoftwaremanager.com/",
       "supportPhone": "+18005555555"
     }
   }

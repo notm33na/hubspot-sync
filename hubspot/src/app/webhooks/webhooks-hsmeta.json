@@ -3,7 +3,7 @@
   "type": "webhooks",
   "config": {
     "settings": {
-      "targetUrl": "https://fernhill-order-sync.vercel.app/api/hubspot/webhook",
+      "targetUrl": "https://fernhill.mediaandsoftwaremanager.com/api/hubspot/webhook",
       "maxConcurrentRequests": 2
     },
     "subscriptions": {

@@ -16,7 +16,7 @@ import {
   hubspot,
 } from '@hubspot/ui-extensions';
 
-const API_BASE = 'https://fernhill-order-sync.vercel.app';
+const API_BASE = 'https://fernhill.mediaandsoftwaremanager.com';
 
 interface Order {
   orderNumber: string;

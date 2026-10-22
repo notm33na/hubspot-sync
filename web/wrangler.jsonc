@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "fernhill-order-sync",
+  "main": "worker.ts",
+  "compatibility_date": "2026-10-15",
+  // node:crypto, node:async_hooks, Buffer and process.env (secrets) for the shared lib/ code.
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "routes": [{ "pattern": "fernhill.mediaandsoftwaremanager.com", "custom_domain": true }],
+  // Was the Vercel cron in vercel.json: daily job at 06:00 UTC.
+  "triggers": { "crons": ["0 6 * * *"] },
+  // Secrets (wrangler secret put / secret bulk): HUBSPOT_TOKEN, HUBSPOT_CLIENT_SECRET, HUBSPOT_APP_ID,
+  // HUBSPOT_PORTAL_ID, SUPABASE_URL, SUPABASE_SECRET_KEY, DRAIN_SECRET, CRON_SECRET, RATE_LIMIT_SALT.
+  "observability": { "enabled": true }
+}

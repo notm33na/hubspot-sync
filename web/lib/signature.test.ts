@@ -44,9 +44,28 @@ describe('verifyHubSpotV3', () => {
 });
 
 describe('publicUrl', () => {
-  it('uses the forwarded host', () => {
-    const req = new Request('http://internal:3000/api/x?a=1', { headers: { 'x-forwarded-host': 'demo.vercel.app' } });
-    expect(publicUrl(req)).toBe('https://demo.vercel.app/api/x?a=1');
+  const live = 'https://fernhill.mediaandsoftwaremanager.com/api/card/orders?contactId=1&userEmail=a%40example.org';
+
+  it('is the URL the Worker received (the one HubSpot called)', () => {
+    expect(publicUrl(new Request(live))).toBe(live);
+  });
+
+  it('ignores client-supplied forwarding headers', () => {
+    const req = new Request(live, { headers: { 'x-forwarded-host': 'evil.example', host: 'evil.example' } });
+    expect(publicUrl(req)).toBe(live);
+  });
+
+  it('lets a request HubSpot signed for the custom domain verify', () => {
+    // HubSpot signs the decoded URI over https://fernhill.mediaandsoftwaremanager.com/...
+    const sig = sign(`GET${live.replace('%40', '@')}${now}`);
+    const req = new Request(live, { headers: headers(sig) });
+    expect(verifyHubSpotV3({ method: 'GET', url: publicUrl(req), rawBody: '', headers: req.headers, secret, now })).toEqual({ ok: true });
+  });
+
+  it('rejects a signature made for the old Vercel host', () => {
+    const sig = sign(`GET${live.replace('fernhill.mediaandsoftwaremanager.com', 'fernhill-order-sync.vercel.app').replace('%40', '@')}${now}`);
+    const req = new Request(live, { headers: headers(sig) });
+    expect(verifyHubSpotV3({ method: 'GET', url: publicUrl(req), rawBody: '', headers: req.headers, secret, now }).ok).toBe(false);
   });
 });
 

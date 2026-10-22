@@ -1,10 +1,16 @@
 // Job runner (ARCHITECTURE §6): claim a few rows at a time, process one by one, record the outcome.
 import type { InboxRow, OutboxRow } from '../db';
 import { log } from '../log';
+import { subrequestsLeft } from '../runtime';
 import { processInboxEvent, type JobResult, type SyncDeps } from './inbound';
 import { processOutboxJob } from './outbound';
 
 const BATCH = 5;
+// Workers Free: 50 subrequests per invocation. Worst case for one row is ~15 (create + link a contact
+// with every HubSpot call retried 3 times, then finish_job and the log line), so a row only starts with
+// 16 left, and a claim needs one more. A typical row costs ~4, so a drain still handles ~8 rows.
+export const ROW_SUBREQUESTS = 16;
+const CLAIM_SUBREQUESTS = ROW_SUBREQUESTS + 1;
 
 export interface DrainStats {
   done: number;
@@ -35,17 +41,18 @@ async function drain<T extends { id: number }>(
   const stats: DrainStats = { done: 0, skipped: 0, requeued: 0, failed: 0, dead: 0 };
   const direction = queue === 'inbox' ? 'inbound' : 'outbound';
 
-  // Claim only while there is time left. Every claimed row is finished, failed, or released.
-  while (Date.now() < deadline) {
+  // Claim only while there is time and subrequest budget left. Every claimed row is finished, failed, or released.
+  while (Date.now() < deadline && subrequestsLeft() >= CLAIM_SUBREQUESTS) {
     const rows = await deps.db.rpc<T[]>(claimFn, { p_limit: BATCH });
     if (!rows?.length) break;
 
     for (const [i, row] of rows.entries()) {
-      if (Date.now() >= deadline) {
-        // Out of time: hand unstarted rows back now instead of leaving them stuck for 5 minutes.
+      const outOfTime = Date.now() >= deadline;
+      if (outOfTime || subrequestsLeft() < ROW_SUBREQUESTS) {
+        // Hand unstarted rows back now instead of leaving them stuck for 5 minutes; the next drain takes them.
         const unstarted = rows.slice(i).map((r) => r.id);
         await deps.db.rpc('release_jobs', { p_queue: queue, p_ids: unstarted });
-        log('jobs_released', { queue, count: unstarted.length });
+        log('jobs_released', { queue, count: unstarted.length, reason: outOfTime ? 'deadline' : 'subrequests' });
         return stats;
       }
       try {

@@ -45,11 +45,12 @@ export function safeEqual(a: string, b: string): boolean {
   return x.length === y.length && crypto.timingSafeEqual(x, y);
 }
 
-// Vercel sits behind a proxy; rebuild the public URL HubSpot actually called.
+// The public URL HubSpot called, as signed. On Cloudflare Workers request.url already is that URL
+// (e.g. https://fernhill.mediaandsoftwaremanager.com/api/card/orders?...). Forwarding headers are ignored:
+// on Workers they come from the client, so trusting them would let any caller change the signed URL.
 export function publicUrl(request: Request): string {
   const u = new URL(request.url);
-  const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host') ?? u.host;
-  return `https://${host}${u.pathname}${u.search}`;
+  return `https://${u.host}${u.pathname}${u.search}`;
 }
 
 // Bearer check for internal endpoints (/api/drain, /api/cron/daily).

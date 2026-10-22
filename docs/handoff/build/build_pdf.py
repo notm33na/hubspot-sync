@@ -21,7 +21,7 @@ HANDOFF = Path(__file__).resolve().parents[1]
 REPO = HANDOFF.parents[1]
 OUT = HANDOFF / "Fernhill-Order-Sync-Handoff.pdf"
 DOCS = sorted(p.name for p in HANDOFF.glob("0[1-9]-*.md"))
-VERSION, DATE = "1.0", "9 October 2026"
+VERSION, DATE = "1.1", "22 October 2026"
 MERMAID = "https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"
 CHROME = os.environ.get("CHROME") or next(
     (p for p in [r"C:\Program Files\Google\Chrome\Application\chrome.exe",
@@ -90,7 +90,7 @@ def page(docs, pages, markers):
   <p class="subtitle">HubSpot ↔ Supabase order and contact integration</p>
   <div class="meta">Prepared by <strong>Media &amp; Software Manager</strong><br>
   Version {VERSION} · {DATE}<br>
-  Live demo: fernhill-order-sync.vercel.app</div>
+  Live demo: fernhill.mediaandsoftwaremanager.com</div>
   <div class="note"><strong>Demo notice.</strong> Fernhill Supply Co. is a fictional company. The live system holds only
   synthetic data: generated names, @example.com email addresses and seeded orders. This document contains no passwords,
   tokens or keys.</div>

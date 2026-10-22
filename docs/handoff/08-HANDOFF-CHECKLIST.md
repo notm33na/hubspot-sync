@@ -5,12 +5,12 @@ the others need the client's own accounts.
 
 ## Functionality
 
-- [ ] **(live)** The quote form at <https://fernhill-order-sync.vercel.app> creates a contact and a deal in HubSpot, and a second identical submission shows "Already received" without creating duplicates.
+- [ ] **(live)** The quote form at <https://fernhill.mediaandsoftwaremanager.com> creates a contact and a deal in HubSpot, and a second identical submission shows "Already received" without creating duplicates.
 - [ ] **(live)** The **Orders** card on a HubSpot contact lists that contact's orders, newest first, and shows an empty state for a contact with no orders.
 - [ ] **(live)** Editing a contact's name, email, phone or lifecycle stage in HubSpot updates the database within 2 minutes.
 - [ ] **(live)** Adding an order in the database updates the contact's total orders, lifetime value and last order date in HubSpot within 2 minutes.
 - [ ] **(live)** Deleting a demo contact in HubSpot clears its personal details in the database and keeps its orders.
-- [ ] **(live)** <https://fernhill-order-sync.vercel.app/activity> lists sync events with no names or emails, and shows "Parked jobs needing attention: 0".
+- [ ] **(live)** <https://fernhill.mediaandsoftwaremanager.com/activity> lists sync events with no names or emails, and shows "Parked jobs needing attention: 0".
 
 ## Reliability and safety
 
@@ -29,7 +29,7 @@ the others need the client's own accounts.
 ## Ownership and documentation
 
 - [ ] Documents 1–7 and this checklist received, as Markdown and as the PDF.
-- [ ] Deployed on the client's own GitHub, Supabase, Vercel and HubSpot accounts ([Access and ownership](05-ACCESS-AND-OWNERSHIP.md)).
+- [ ] Deployed on the client's own GitHub, Supabase, Cloudflare and HubSpot accounts ([Access and ownership](05-ACCESS-AND-OWNERSHIP.md)).
 - [ ] All secrets created by the client; the demo deployment decommissioned on the agreed date.
 - [ ] The client has run `node scripts/smoke-test.mjs --yes` on their own setup.
 - [ ] Limitations and the upgrade roadmap read and accepted ([Limitations and next steps](07-LIMITATIONS-AND-NEXT-STEPS.md)).

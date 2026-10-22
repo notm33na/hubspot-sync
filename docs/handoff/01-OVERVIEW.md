@@ -22,13 +22,13 @@ order history inside HubSpot, and contact changes made in HubSpot reach the data
 - **No double entry.** Contact details are maintained once, in HubSpot; the database follows.
 - **Reliable by design.** Every change is queued, retried automatically, and checked again by a daily job. Nothing
   loops and nothing is duplicated. This was verified on the live system on 9 October 2026 (see [Testing and QA](06-TESTING-AND-QA.md)).
-- **Low running cost.** The demo runs entirely on free tiers (HubSpot free CRM, Supabase Free, Vercel Hobby). For
+- **Low running cost.** The demo runs entirely on free tiers (HubSpot free CRM, Supabase Free, Cloudflare Workers Free). For
   production use with real customers, see [Limitations and next steps](07-LIMITATIONS-AND-NEXT-STEPS.md).
 
 ## Live links
 
-- Quote form: <https://fernhill-order-sync.vercel.app>
-- Sync activity: <https://fernhill-order-sync.vercel.app/activity>
+- Quote form: <https://fernhill.mediaandsoftwaremanager.com>
+- Sync activity: <https://fernhill.mediaandsoftwaremanager.com/activity>
 - Demo video (90 seconds): `Fernhill-Order-Sync-Demo.mp4`, included in this delivery
 - Source code: the `source/` folder, included in this delivery
 

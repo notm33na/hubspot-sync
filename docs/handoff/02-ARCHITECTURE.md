@@ -11,7 +11,7 @@ flowchart LR
     Card["Orders card<br/>on contact record"]
     Contacts[(Contacts & deals)]
   end
-  subgraph Vercel["Vercel (Hobby)"]
+  subgraph Worker["Cloudflare Workers (Free)"]
     Form["Quote form"]
     API["API routes<br/>webhook · drain · card · daily job"]
   end
@@ -34,8 +34,8 @@ flowchart LR
 | Component | Role | What lives there |
 |---|---|---|
 | **HubSpot app** "Fernhill Order Sync (demo)" | Connects to the CRM. Sends a notification (webhook) when a contact changes, and shows the **Orders** card on contact records. | App settings, webhook subscriptions, the card, three contact properties: *Demo: total orders*, *Demo: lifetime value*, *Demo: last order date* |
-| **Vercel** (website and server) | Does all the work: receives HubSpot notifications, runs the sync, serves the quote form, the activity page and the card's data, and runs a daily check. | The Next.js web application and its configuration (environment variables) |
-| **Supabase** (database) | Stores customers and orders, and two work queues. Signals Vercel every minute (and immediately on new work) when there is something to do. | Postgres database, scheduler (`pg_cron`), one secret in Supabase Vault |
+| **Cloudflare Workers** (website and server) | Does all the work: receives HubSpot notifications, runs the sync, serves the quote form, the activity page and the card's data, and runs a daily check. | The Worker (TypeScript, no framework), its daily Cron Trigger and its configuration (secrets) |
+| **Supabase** (database) | Stores customers and orders, and two work queues. Signals the Worker every minute (and immediately on new work) when there is something to do. | Postgres database, scheduler (`pg_cron`), one secret in Supabase Vault |
 
 The code for all three lives in one GitHub repository; every push runs automated tests and a secret scan.
 
@@ -44,9 +44,9 @@ The code for all three lives in one GitHub repository; every push runs automated
 ### HubSpot → database (contact changes)
 
 1. Someone edits a contact in HubSpot.
-2. HubSpot sends a signed notification to Vercel. Vercel checks the signature, saves the notification in a queue and
+2. HubSpot sends a signed notification to the Worker. The Worker checks the signature, saves the notification in a queue and
    replies at once.
-3. Vercel then asks HubSpot for the contact's **current** details and saves them in the database. It never trusts the
+3. The Worker then asks HubSpot for the contact's **current** details and saves them in the database. It never trusts the
    notification's own copy, so late or out-of-order notifications cannot overwrite newer data.
 
 Deleting a contact in HubSpot clears that customer's personal details in the database; their orders are kept.
@@ -54,8 +54,8 @@ Deleting a contact in HubSpot clears that customer's personal details in the dat
 ### Database → HubSpot (orders)
 
 1. An order is added, changed or removed in the database.
-2. In the same database transaction, a job is queued to recalculate that customer's totals, and Vercel is signalled.
-3. Vercel recalculates total orders, lifetime value (cancelled orders excluded) and last order date, and updates the
+2. In the same database transaction, a job is queued to recalculate that customer's totals, and the Worker is signalled.
+3. The Worker recalculates total orders, lifetime value (cancelled orders excluded) and last order date, and updates the
    three properties on the HubSpot contact.
 
 A customer created directly in the database is linked to the HubSpot contact with the same email, or a new contact is
@@ -91,14 +91,14 @@ submissions are recognised for 24 hours, so a reload or double click returns the
   exists, which catches anything a lost notification would have missed.
 
 **Security.** Every request from HubSpot is signature-checked (requests older than 5 minutes are refused). Internal
-endpoints need a secret. The database is closed to public access. Secrets live only in Vercel's encrypted settings,
+endpoints need a secret. The database is closed to public access. Secrets live only in the Worker's encrypted secrets,
 Supabase Vault and a local file that is never committed.
 
 ## Technical appendix
 
 | Topic | Detail |
 |---|---|
-| Stack | Next.js 16 (Node 22) on Vercel; Postgres 17 on Supabase with `pg_cron`, `pg_net`, Vault; HubSpot developer platform 2026.09 project with a static-token private app, an app card (React) and webhooks v3 |
+| Stack | TypeScript on Cloudflare Workers (no framework); Postgres 17 on Supabase with `pg_cron`, `pg_net`, Vault; HubSpot developer platform 2026.09 project with a static-token private app, an app card (React) and webhooks v3 |
 | Endpoints | `POST /api/hubspot/webhook` (HubSpot v3 signature), `GET /api/card/orders` (signed `hubspot.fetch`, portal ID checked), `POST /api/drain` (bearer `DRAIN_SECRET`), `GET /api/cron/daily` (bearer `CRON_SECRET`, 06:00 UTC), `POST /api/form` |
 | Webhook subscriptions | Contact creation, deletion, privacy deletion, merge, restore; property changes for `firstname`, `lastname`, `email`, `phone`, `lifecyclestage`; HubSpot concurrency capped at 2 |
 | Queues | `sync_inbox` (one row per webhook event, unique `dedupe_key`) and `sync_outbox` (`rollup` and `link_contact`, one pending job per customer and kind). Rows are claimed with `FOR UPDATE SKIP LOCKED`; an abandoned claim is reclaimed after 5 minutes. |

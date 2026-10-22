@@ -18,10 +18,10 @@ directions, reliably. Lead with what they see; mention the engineering in one or
 - [ ] Close notifications (Windows Focus Assist on), email and chat apps.
 
 **Have these tabs open, in order**
-1. The live form: `https://fernhill-order-sync.vercel.app`
+1. The live form: `https://fernhill.mediaandsoftwaremanager.com`
 2. HubSpot contact record: **Avery Lindqvist** (has orders), card visible
 3. Supabase Table Editor: `orders` table, filtered to Avery
-4. `https://fernhill-order-sync.vercel.app/activity`
+4. `https://fernhill.mediaandsoftwaremanager.com/activity`
 
 **Free recording tools:** OBS Studio (best quality), or Windows Snipping Tool → Record (simplest).
 Edit and add captions in Clipchamp (built into Windows). Record at 1920×1080.

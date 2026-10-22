@@ -2,7 +2,7 @@
 
 **Prepared by Media & Software Manager** · Version 1.0 · 9 October 2026
 
-This package hands over the Fernhill Order Sync integration (HubSpot ↔ Supabase ↔ Vercel) to the team that will
+This package hands over the Fernhill Order Sync integration (HubSpot ↔ Supabase ↔ Cloudflare Workers) to the team that will
 own and run it.
 
 **What is in the delivery**
@@ -20,7 +20,7 @@ own and run it.
 |---|---|---|
 | 1 | [Overview](01-OVERVIEW.md) | understand what the system does and why it is useful (one page) |
 | 2 | [Architecture](02-ARCHITECTURE.md) | see how the pieces fit and why the sync is safe and reliable |
-| 3 | [Setup guide](03-SETUP-GUIDE.md) | deploy it from zero on your own HubSpot, Supabase, Vercel and GitHub accounts |
+| 3 | [Setup guide](03-SETUP-GUIDE.md) | deploy it from zero on your own HubSpot, Supabase, Cloudflare and GitHub accounts |
 | 4 | [Operations runbook](04-OPERATIONS-RUNBOOK.md) | monitor it day to day, fix common problems, rotate secrets |
 | 5 | [Access and ownership](05-ACCESS-AND-OWNERSHIP.md) | know every account, key and secret, and transfer ownership |
 | 6 | [Testing and QA](06-TESTING-AND-QA.md) | see what is tested and the latest live test results |
@@ -31,8 +31,8 @@ own and run it.
 
 | What | Where |
 |---|---|
-| Live quote form | <https://fernhill-order-sync.vercel.app> |
-| Live sync activity page | <https://fernhill-order-sync.vercel.app/activity> |
+| Live quote form | <https://fernhill.mediaandsoftwaremanager.com> |
+| Live sync activity page | <https://fernhill.mediaandsoftwaremanager.com/activity> |
 | Source code | The `source/` folder in this delivery |
 | Demo video (90 seconds) | `Fernhill-Order-Sync-Demo.mp4` in this delivery |
 

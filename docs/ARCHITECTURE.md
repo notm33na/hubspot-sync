@@ -7,19 +7,19 @@ Status: draft for review · 2026-10-07 · Requirements: [PRD.md](PRD.md) · Free
 ```
 HubSpot free CRM account
  └─ App "Fernhill Order Sync (demo)" — project, static token, private
-     ├─ App card on contact record ──hubspot.fetch (signed v3)──► Vercel /api/card/orders
-     └─ Webhooks v3 (§3) ───────────────────────────────────────► Vercel /api/hubspot/webhook
+     ├─ App card on contact record ──hubspot.fetch (signed v3)──► Worker /api/card/orders
+     └─ Webhooks v3 (§3) ───────────────────────────────────────► Worker /api/hubspot/webhook
 
-Vercel Hobby — one Next.js app; all sync logic runs here
+Cloudflare Workers Free — one Worker (fernhill.mediaandsoftwaremanager.com); all sync logic runs here
  ├─ /  demo form ──► /api/form ──► HubSpot API
  ├─ /activity  sync activity page (R11)
  ├─ /api/drain  ◄── Supabase pg_cron every minute + database trigger on new outbox rows
- └─ /api/cron/daily  ◄── Vercel cron, once a day: reconcile + prune
+ └─ /api/cron/daily  ◄── Cron Trigger, once a day at 06:00 UTC: reconcile + prune
 
 Supabase free — Postgres only: tables, triggers, pg_cron, pg_net, Vault (no Edge Functions)
 ```
 
-Supabase stores data and *signals* work; Vercel *does* the work. That gives one deploy target, one log stream
+Supabase stores data and *signals* work; the Worker *does* the work. That gives one deploy target, one log stream
 and one place for application secrets.
 
 ## 2. Data model (Supabase)
@@ -38,7 +38,7 @@ and one place for application secrets.
 `dead` is terminal: a non-429 4xx error, or 8 failed attempts. Dead rows show on `/activity` and are never retried automatically.
 
 **Access:** RLS is on for every table with no policies, and `anon` / `authenticated` grants on the `public` schema
-are revoked. Only Vercel server code, using the Supabase secret (service-role) key, reads or writes data (R8).
+are revoked. Only the Worker, using the Supabase secret (service-role) key, reads or writes data (R8).
 
 HubSpot custom contact properties, created by an idempotent setup script (create only if missing):
 `demo_total_orders`, `demo_lifetime_value`, `demo_last_order_date`, in a group named "Demo order data".
@@ -47,7 +47,7 @@ HubSpot custom contact properties, created by an idempotent setup script (create
 
 - **Scopes:** `crm.objects.contacts.read`, `crm.objects.contacts.write`, `crm.objects.deals.read`,
   `crm.objects.deals.write`, `crm.schemas.contacts.write` (setup script only).
-- **`permittedUrls.fetch`:** `https://<vercel-domain>/api/` only.
+- **`permittedUrls.fetch`:** `https://<worker-domain>/api/` only.
 - **Webhooks:** `maxConcurrentRequests: 2`. Subscriptions:
   contact creation, deletion, privacy deletion, merge, restore, and property change for
   `firstname`, `lastname`, `email`, `phone`, `lifecyclestage`.
@@ -112,7 +112,9 @@ The spike showed that property events on creation are unreliable, which is why p
 - **Claiming:** `UPDATE … SET status = 'processing', claimed_at = now() WHERE id IN (SELECT id … WHERE
   (status IN ('pending','failed') AND next_attempt_at <= now()) OR (status = 'processing' AND claimed_at < now() - interval '5 min')
   ORDER BY id LIMIT 20 FOR UPDATE SKIP LOCKED) RETURNING *`. Rows abandoned by a crashed run are reclaimed after 5 minutes.
-- Rows are processed **one at a time** per invocation, within the route's `maxDuration`.
+- Rows are processed **one at a time** per invocation. Background drains stop claiming after 15 s (Workers cut
+  `waitUntil` work 30 s after the response) and before the Workers Free limit of 50 subrequests per invocation:
+  a row only starts with 16 subrequests left (its worst case). Claimed rows that don't fit are released at once.
 - **Failure:** `attempts + 1`, `last_error` set, `next_attempt_at` backs off 1 → 5 → 30 → 120 min.
   After 8 attempts, or on a non-429 4xx, the row becomes `dead`.
 
@@ -121,8 +123,8 @@ The spike showed that property events on creation are unreliable, which is why p
 **Card (R5).** `GET /api/card/orders?contactId=…&page=…` via `hubspot.fetch`. HubSpot appends `portalId`, `userId`,
 `userEmail` and `appId` and signs the whole URL, so the query string cannot be tampered with. The handler verifies
 the signature, rejects any `portalId ≠ HUBSPOT_PORTAL_ID`, and returns at most 20 orders plus `nextPage`.
-App code never logs the query string. Vercel's own request log does record URLs, including a HubSpot user's email,
-and keeps them only briefly.
+App code never logs the query string. Cloudflare's request log (Workers Logs) does record URLs, including a HubSpot
+user's email, and keeps them only briefly.
 
 **Form (R6).**
 - **Abuse control:** reject non-`@example.com` emails and filled honeypots. Limit each IP to 5 submissions per hour
@@ -154,13 +156,14 @@ No `link_contact` work is queued; the roll-ups queued by inserting orders go thr
 **HubSpot signatures (v3).** Headers `X-HubSpot-Signature-v3` and `X-HubSpot-Request-Timestamp`. Reject a timestamp
 more than 5 min old **or** more than 5 min in the future. Sign `method + URI + rawBody + timestamp` with HMAC-SHA256
 using the app's client secret, base64-encode, and compare in constant time. Rules proven in the spike:
-use the **raw** body (empty string for GET); rebuild the public URL from `x-forwarded-host`; decode only HubSpot's
+use the **raw** body (empty string for GET); sign over the URL the Worker received (`request.url`, the public
+URL; client-supplied forwarding headers are ignored); decode only HubSpot's
 listed characters (`%3A`, `%40`, …). A 401 response body is just `unauthorized`; the reason goes to the log only.
 
-**Internal endpoints.** `/api/drain` checks `DRAIN_SECRET`, and `/api/cron/daily` checks Vercel's
-`Authorization: Bearer $CRON_SECRET`. Both comparisons are constant-time.
+**Internal endpoints.** `/api/drain` checks `DRAIN_SECRET`, and `/api/cron/daily` checks
+`Authorization: Bearer $CRON_SECRET` (the Cron Trigger calls the same handler with it). Both comparisons are constant-time.
 
-**Secrets** are kept in Vercel environment variables (marked Sensitive) and a gitignored `.env.local`.
+**Secrets** are kept as Cloudflare Worker secrets (encrypted, write-only) and in a gitignored `.env.local`.
 The only secret on the database side is `DRAIN_SECRET`, held in Supabase Vault.
 A gitleaks pre-commit hook and a GitHub Actions job (free) scan every commit.
 
@@ -188,7 +191,7 @@ A gitleaks pre-commit hook and a GitHub Actions job (free) scan every commit.
 
 - **Rate limits:** a per-instance bucket cannot coordinate serverless instances, so **429 with `Retry-After` is the
   main control**. Webhook concurrency is capped at 2, queue rows are processed one at a time, and the daily job
-  runs search calls one after another. Waits must fit within the route's `maxDuration`; otherwise the row is released for the next drain.
+  runs search calls one after another. Waits must fit within the drain's deadline; otherwise the row is released for the next drain.
 - **Retries:** on 429, wait for `Retry-After`; on 5xx or network errors, back off and retry in place (3 tries), then
   hand the row back to the queue. Other 4xx errors are `dead`, with the response message stored in `last_error`.
 - **Find or create:** read by email; on 404, create. If the create returns 409 (the contact already exists, because
@@ -212,15 +215,15 @@ Keep-alive comes from `pg_cron` querying the database every minute, and from thi
 
 ```
 hubspot/   HubSpot project (app, card, webhooks) — platform 2026.09
-web/       Next.js app for Vercel (form, activity page, API routes)
+web/       Cloudflare Worker (worker.ts: form and activity pages, API routes, Cron Trigger)
 supabase/  SQL migrations (no secret values) and database behaviour tests
 scripts/   migrations runner (tracks applied files in private.schema_migrations), setup, demo reset
 docs/      PRD, architecture, demo script
 ```
 
 CLI quirks on Windows (the `&` in the repo path) are in the README. Other CLI notes: the first
-`hs project upload` to a new account needs `--force`, and `vercel logs` can drop later lines of a request,
-so the app logs one line per request.
+`hs project upload` to a new account needs `--force`, and the app logs one JSON line per request or job
+(Workers Logs, `wrangler tail`).
 
 ## 12. Traceability
 
@@ -247,5 +250,5 @@ so the app logs one line per request.
 | Merge, restore and privacy-deletion webhook subscriptions accepted for a static app | `hs project upload` validates the subscription list |
 | What `GET` returns for a merged ID | Test once with two demo contacts |
 | Custom contact property limit on free HubSpot | Setup script creates only 3; confirm none are rejected |
-| `waitUntil` finishes after the 204 on Hobby | Covered anyway by the per-minute drain |
+| `waitUntil` work is cut 30 s after the 204 on Workers | Drains stop at 15 s; anything cut short is covered by the per-minute drain |
 | Search API rate limit value | Confirm in HubSpot's usage guidelines before building §10 |

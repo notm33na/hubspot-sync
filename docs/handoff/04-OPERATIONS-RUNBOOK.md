@@ -2,7 +2,7 @@
 
 ## Daily monitoring (2 minutes)
 
-Open **<https://fernhill-order-sync.vercel.app/activity>** (or `/activity` on your own address).
+Open **<https://fernhill.mediaandsoftwaremanager.com/activity>** (or `/activity` on your own address).
 
 | Check | Healthy | Action if not |
 |---|---|---|
@@ -16,13 +16,12 @@ differed. `stale` means an older notification arrived late and was correctly ign
 integration's own change coming back, ignored by design. `N duplicates ignored` means a notification was received
 again and de-duplicated. `skipped` means there was nothing to do, for example a deleted customer.
 
-**Logs:** Vercel → project → *Logs*. The app writes one JSON line per request or job (for example `webhook_received`,
+**Logs:** Cloudflare → *Workers & Pages* → `fernhill-order-sync` → *Logs* (or `wrangler tail` from `web/`). The app writes one JSON line per request or job (for example `webhook_received`,
 `drain`, `job_failed`, `webhook_rejected`, `daily`) and never logs names, emails or secrets.
 
 ## What the daily job does
 
-Vercel calls `/api/cron/daily` once a day at **06:00 UTC**. On the Hobby plan Vercel may run it up to 59 minutes
-late. The job:
+The Worker's Cron Trigger runs the daily job (`/api/cron/daily`) once a day at **06:00 UTC**. The job:
 
 1. Deletes activity lines and finished queue rows older than 30 days, and form rate-limit records older than 2 days.
 2. Retries any queued work that is due.
@@ -32,8 +31,9 @@ late. The job:
    ones are re-pointed to the surviving contact.
 5. Writes one `daily` line to `/activity`, such as `12 recent, 8 checked, 0 errors`.
 
-If the line shows errors, check the Vercel logs for `daily_contact_failed` (it names the contact ID and the error).
-If it shows `timed out`, the next day's run continues the work.
+If the line shows errors, check the Worker logs for `daily_contact_failed` (it names the contact ID and the error).
+If it shows `timed out`, the run hit its time limit or the Workers limit of 50 outgoing requests per run; the next
+day's run continues the work, and the per-minute drain keeps processing queued work in between.
 
 Separately, Supabase's scheduler signals the web app **every minute** so that queued work and retries are processed.
 This also keeps the free Supabase project active.
@@ -42,7 +42,7 @@ This also keeps the free Supabase project active.
 
 ### Supabase project paused
 
-- **Symptoms:** `/activity` says the log is unavailable. Vercel logs show `webhook_insert_failed`, and the quote form fails.
+- **Symptoms:** `/activity` says the log is unavailable. Worker logs show `webhook_insert_failed`, and the quote form fails.
 - **Cause:** free Supabase projects pause after 7 days without activity. The per-minute scheduler is designed to
   prevent this, but a paused project stops the scheduler too.
 - **Fix:** Supabase dashboard → project → **Restore project**, then wait a few minutes.
@@ -54,15 +54,15 @@ This also keeps the free Supabase project active.
 
 - **Symptoms:** jobs fail with `HTTP 401`, are parked immediately (a rejected request cannot succeed on retry), and
   the parked count rises. The card still loads, because it reads only from the database.
-- **Fix:** get the current token from the HubSpot app's *Distribution* tab. Update `HUBSPOT_TOKEN` in `.env.local`, run
-  `node scripts/push-vercel-env.mjs` from `web/`, and redeploy. Then [re-queue the parked jobs](#parked-jobs-after-8-attempts).
+- **Fix:** get the current token from the HubSpot app's *Distribution* tab. Update `HUBSPOT_TOKEN` in `.env.local` and run
+  `node scripts/push-worker-secrets.mjs` (it takes effect at once). Then [re-queue the parked jobs](#parked-jobs-after-8-attempts).
 
 ### Webhook signature failures
 
-- **Symptoms:** HubSpot edits stop reaching the database. Vercel logs show `webhook_rejected` with a reason.
+- **Symptoms:** HubSpot edits stop reaching the database. Worker logs show `webhook_rejected` with a reason.
 - **Reasons and fixes:**
-  - `signature mismatch`: `HUBSPOT_CLIENT_SECRET` in Vercel is wrong or old. Update it from the app's *Auth* tab and
-    redeploy. If the app was moved to a new web address, the webhook `targetUrl` and the address HubSpot calls must match.
+  - `signature mismatch`: `HUBSPOT_CLIENT_SECRET` in the Worker is wrong or old. Update it from the app's *Auth* tab and
+    run `node scripts/push-worker-secrets.mjs`. If the app was moved to a new web address, the webhook `targetUrl` and the address HubSpot calls must match.
   - `timestamp outside 5 min window`: an old request was replayed, or the sender's clock is wrong. Genuine HubSpot
     traffic is never affected.
   - `missing signature headers`: the request did not come from HubSpot. Nothing to fix.
@@ -106,17 +106,18 @@ HubSpot IDs. **It is for the demo only.** Never run it against an account holdin
 ## Rotating secrets
 
 Rotate a secret straight away if it may have leaked, and otherwise on a schedule you choose (for example yearly).
-After changing any value in Vercel, **redeploy**: environment changes take effect on the next deployment.
+Update the value in `.env.local` and run `node scripts/push-worker-secrets.mjs`: Worker secrets take effect at once
+(the upload deploys a new version).
 
 | Secret | How to rotate | Side effects |
 |---|---|---|
-| `HUBSPOT_TOKEN` | HubSpot app → *Distribution* tab → rotate the access token. Update `.env.local`, run `push-vercel-env.mjs`, redeploy. | Jobs fail until the redeploy, then retry. Re-queue any parked jobs. |
-| `HUBSPOT_CLIENT_SECRET` | HubSpot app → *Auth* tab → rotate the client secret. Update, push, redeploy. | Webhooks are rejected until the redeploy. The next daily job repairs contacts changed meanwhile. |
-| `SUPABASE_SECRET_KEY` | Supabase → *API Keys* → create a new secret key. Update, push, redeploy, then delete the old key. | None if the old key is deleted only after the redeploy. |
+| `HUBSPOT_TOKEN` | HubSpot app → *Distribution* tab → rotate the access token. Update `.env.local`, run `push-worker-secrets.mjs`. | Jobs fail until the upload, then retry. Re-queue any parked jobs. |
+| `HUBSPOT_CLIENT_SECRET` | HubSpot app → *Auth* tab → rotate the client secret. Update, push. | Webhooks are rejected until the upload. The next daily job repairs contacts changed meanwhile. |
+| `SUPABASE_SECRET_KEY` | Supabase → *API Keys* → create a new secret key. Update, push, then delete the old key. | None if the old key is deleted only after the upload. |
 | Database password (in `SUPABASE_DB_URL`) | Supabase → *Database settings* → reset the password. Update `.env.local`. | Used by scripts only; the running app is unaffected. |
-| `DRAIN_SECRET` | Delete its line from `.env.local` and run `push-vercel-env.mjs` (a new one is generated). Redeploy, then run `bash scripts/set-vault-secrets.sh https://<your-domain>/api/drain`. | Work signals are refused for a minute or two between the steps. Queued work waits and is not lost. |
-| `CRON_SECRET` | Delete its line, run `push-vercel-env.mjs`, redeploy. | None (Vercel sends the new value automatically). |
-| `RATE_LIMIT_SALT` | Delete its line, run `push-vercel-env.mjs`, redeploy. | Current form rate-limit counters reset. |
+| `DRAIN_SECRET` | Delete its line from `.env.local` and run `push-worker-secrets.mjs` (a new one is generated), then run `bash scripts/set-vault-secrets.sh https://<your-domain>/api/drain`. | Work signals are refused for a minute or two between the steps. Queued work waits and is not lost. |
+| `CRON_SECRET` | Delete its line, run `push-worker-secrets.mjs`. | None (the Cron Trigger sends the new value automatically). |
+| `RATE_LIMIT_SALT` | Delete its line, run `push-worker-secrets.mjs`. | Current form rate-limit counters reset. |
 | HubSpot personal access key (CLI) | HubSpot → *Development → Keys*. Revoke, create a new one, run `hs account auth`. | CLI only. |
 
 After a rotation, check `/activity` and run the smoke test if in doubt.

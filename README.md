@@ -22,7 +22,7 @@ built entirely on free tiers (no paid plan, no credit card).
 |---|---|
 | ![Orders card on a HubSpot contact record, showing orders read live from the Supabase database](docs/images/orders-card.png) | ![Quote form that creates a HubSpot contact and deal](docs/images/quote-form.png) |
 
-Live demo: **https://fernhill-order-sync.vercel.app** (form) · **/activity** (sync log)
+Live demo: **https://fernhill.mediaandsoftwaremanager.com** (form) · **/activity** (sync log)
 
 Built by **M&S Manager** · [case study and more builds](https://www.mediaandsoftwaremanager.com/automation#work)
 
@@ -39,7 +39,7 @@ flowchart LR
     Card["Orders card<br/>on contact record"]
     Contacts[(Contacts & deals)]
   end
-  subgraph Vercel["Vercel (Hobby)"]
+  subgraph Worker["Cloudflare Workers (Free)"]
     Form["Quote form"]
     API["API routes<br/>webhook · drain · card · daily cron"]
   end
@@ -61,7 +61,7 @@ flowchart LR
   The worker always fetches the contact's current state instead of trusting the event, so duplicate or
   out-of-order webhooks can't corrupt data.
 - **Database → HubSpot.** Database triggers queue work in the same transaction as the change; a per-minute
-  signal makes Vercel drain the queue. Failures retry with backoff and are parked (visible) after 8 attempts.
+  signal makes the Worker drain the queue. Failures retry with backoff and are parked (visible) after 8 attempts.
 - **No sync loops.** Each field has one owner (HubSpot owns identity fields, the database owns orders), the
   integration recognises its own writes when they echo back as webhooks, and roll-up properties are never
   subscribed to.
@@ -79,25 +79,27 @@ Client handoff package (setup, runbook, ownership, QA; also as one PDF): [docs/h
 |---|---|---|
 | HubSpot | Free CRM + developer platform | Static-token app, app card, webhooks, CRM API |
 | Supabase | Free | Postgres, `pg_cron`, `pg_net`, Vault |
-| Vercel | Hobby | Next.js hosting, API routes, daily cron |
+| Cloudflare | Workers Free | One Worker: pages, API routes, daily Cron Trigger, custom domain |
 
 Paid-only features were designed out: no HubSpot custom objects (the card shows orders instead), no
-HubSpot-hosted serverless functions (the card calls Vercel), no sub-daily Vercel cron (Supabase `pg_cron` drives retries).
+HubSpot-hosted serverless functions (the card calls the Worker), and Supabase `pg_cron` drives the per-minute retries.
+The Worker stays inside the Free limits: no framework (pages are plain HTML, ~158 KiB compressed), and every
+background drain stops before 50 subrequests and within the 30 s `waitUntil` window, leaving the rest to the next run.
 
 ## Repository layout
 
 ```
 hubspot/    HubSpot project: app config, orders card (React), webhook subscriptions
-web/        Next.js app on Vercel: form, activity page, API routes, sync workers
+web/        Cloudflare Worker: form, activity page, API routes, sync workers (worker.ts, wrangler.jsonc)
 supabase/   SQL migrations and database behaviour tests
-scripts/    Setup and operations: migrations, HubSpot properties, Vercel env, Vault, demo reset
+scripts/    Setup and operations: migrations, HubSpot properties, Worker secrets, Vault, demo reset
 docs/       Requirements, architecture, demo script
 ```
 
 ## Running it yourself
 
-You need Node 22, Docker, the HubSpot CLI (`npm i -g @hubspot/cli`), the Vercel CLI (`npm i -g vercel`),
-and free accounts on HubSpot, Supabase and Vercel.
+You need Node 22, Docker, the HubSpot CLI (`npm i -g @hubspot/cli`), and free accounts on HubSpot,
+Supabase and Cloudflare (Wrangler comes with `npm ci` in `web/`).
 
 1. **Supabase.** Create a free project. Copy `.env.example` to `.env.local` and fill in `SUPABASE_DB_URL`
    (Connect → Session pooler) and `SUPABASE_SECRET_KEY`. Then apply the schema:
@@ -106,9 +108,11 @@ and free accounts on HubSpot, Supabase and Vercel.
    (project → app → Distribution → Install), and fill in `HUBSPOT_TOKEN`, `HUBSPOT_CLIENT_SECRET`,
    `HUBSPOT_APP_ID` and `HUBSPOT_PORTAL_ID`. Create the custom properties:
    `node scripts/setup-hubspot-properties.mjs`
-3. **Vercel.** From `web/`: `vercel link`, then `node ../scripts/push-vercel-env.mjs` (generates the
-   internal secrets) and `vercel deploy --prod`. If your domain differs from `fernhill-order-sync.vercel.app`,
-   update it in `hubspot/src/app/app-hsmeta.json`, `webhooks/webhooks-hsmeta.json` and `cards/OrdersCard.tsx`.
+3. **Cloudflare.** From `web/`: `npm ci`, `node node_modules/wrangler/bin/wrangler.js login`, then
+   `node ../scripts/push-worker-secrets.mjs` (generates the internal secrets) and `npm run deploy`. Set your
+   domain in `web/wrangler.jsonc` (`routes`, a custom domain on a zone in your Cloudflare account). If it differs
+   from `fernhill.mediaandsoftwaremanager.com`, also update it in `hubspot/src/app/app-hsmeta.json`,
+   `webhooks/webhooks-hsmeta.json` and `cards/OrdersCard.tsx`.
 4. **Connect the queue signal.** `bash scripts/set-vault-secrets.sh https://<your-domain>/api/drain`
 5. **Seed demo data.** `node scripts/demo-reset.mjs --yes`
 6. In HubSpot, add the **Orders (Fernhill demo)** card to the contact record (Settings → Objects →
@@ -121,7 +125,7 @@ and free accounts on HubSpot, Supabase and Vercel.
 ## Tests
 
 ```bash
-cd web && npm test && npm run typecheck   # 54 unit tests: signatures, HubSpot client, sync, form, daily job, routes
+cd web && npm test && npm run typecheck   # 66 unit tests: signatures, HubSpot client, sync, form, daily job, routes, pages, Worker limits
 bash supabase/tests/run.sh                # 77 database checks against Supabase's Postgres image (Docker)
 ```
 
@@ -136,6 +140,8 @@ CI runs both on every push. Secrets are blocked by a gitleaks pre-commit hook
 | Reset the demo to its seed state | `node scripts/demo-reset.mjs --yes` |
 | Loop-safety smoke test on the live deployment ([results](docs/SMOKE-TEST.md)) | `node scripts/smoke-test.mjs --yes`, then reset |
 | Update the HubSpot app or card | from `hubspot/`: `hs project upload` |
+| Deploy the Worker | from `web/`: `npm run deploy` (`npm run build` = dry run with size) |
+| Update Worker secrets | `node scripts/push-worker-secrets.mjs` (from `.env.local`) |
 | Watch sync activity | `/activity` on the deployed site |
 
 ## License

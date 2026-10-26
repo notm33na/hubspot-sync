@@ -88,7 +88,7 @@ def page(docs, pages, markers):
   <div class="kicker">Client handoff package</div>
   <h1>Fernhill Order Sync</h1>
   <p class="subtitle">HubSpot ↔ Supabase order and contact integration</p>
-  <div class="meta">Prepared by <strong>Media &amp; Software Manager</strong><br>
+  <div class="meta">Prepared by <strong>Media &amp; Software Manger</strong><br>
   Version {VERSION} · {DATE}<br>
   Live demo: fernhill.mediaandsoftwaremanager.com</div>
   <div class="note"><strong>Demo notice.</strong> Fernhill Supply Co. is a fictional company. The live system holds only

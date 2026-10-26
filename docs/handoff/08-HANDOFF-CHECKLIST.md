@@ -38,7 +38,7 @@ the others need the client's own accounts.
 
 By signing, the client accepts delivery of Fernhill Order Sync version 1.0 as described in this package.
 
-| | Client | Media & Software Manager |
+| | Client | Media & Software Manger |
 |---|---|---|
 | Name | | |
 | Role | | |

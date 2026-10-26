@@ -3,7 +3,7 @@
   size: A4;
   margin: 20mm 17mm 20mm 17mm;
   @top-right { content: "Fernhill Order Sync · Client handoff v1.0"; font: 8pt "Segoe UI", Arial, sans-serif; color: #6b7280; }
-  @bottom-left { content: "Media & Software Manager"; font: 8pt "Segoe UI", Arial, sans-serif; color: #6b7280; }
+  @bottom-left { content: "Media & Software Manger"; font: 8pt "Segoe UI", Arial, sans-serif; color: #6b7280; }
   @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 8pt "Segoe UI", Arial, sans-serif; color: #6b7280; }
 }
 @page :first {

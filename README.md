@@ -24,7 +24,7 @@ built entirely on free tiers (no paid plan, no credit card).
 
 Live demo: **https://fernhill.mediaandsoftwaremanager.com** (form) · **/activity** (sync log)
 
-Built by **M&S Manager** · [case study and more builds](https://www.mediaandsoftwaremanager.com/automation#work)
+Built by **M&S Manger** · [case study and more builds](https://www.mediaandsoftwaremanager.com/automation#work)
 
 ### Demo video (90 seconds)
 

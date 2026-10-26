@@ -1,19 +1,19 @@
 # 5. Access and ownership
 
 This is the inventory of every account, app, key and secret in the system. It gives **names and locations only,
-never values**. Today everything is owned by Media & Software Manager. The client takes ownership by deploying their own copy;
+never values**. Today everything is owned by Media & Software Manger. The client takes ownership by deploying their own copy;
 the checklist at the end tracks it.
 
 ## Accounts and services
 
 | # | Item | Platform / plan | Identifier | Current owner | Holds |
 |---|---|---|---|---|---|
-| A1 | Source code | Git repository (developer's GitHub account) | Delivered as the `source/` folder | Media & Software Manager | All code, documentation, CI workflows (`ci`, `secret-scan`). **No secrets**: the workflows need none. |
-| A2 | Hosting | Cloudflare Workers (Free) | Worker `fernhill-order-sync`, address `fernhill.mediaandsoftwaremanager.com` (custom domain on the developer's zone), code in `web/` | Media & Software Manager's Cloudflare account | The web app, 9 Worker secrets (B1–B9), the daily Cron Trigger. Deployed with `npm run deploy` from `web/` |
-| A3 | Database project | Supabase (Free) | Project `fernhill-order-sync`, organisation `MSmanager`, region Northeast Asia (Seoul) | Media & Software Manager | All tables and data, Vault secrets (C1–C2), the per-minute scheduler job `drain-every-minute` |
-| A4 | CRM account | HubSpot (free CRM) | Account "media and software company" | Media & Software Manager | Demo contacts and deals, the app (A5), the property group *Demo order data* |
+| A1 | Source code | Git repository (developer's GitHub account) | Delivered as the `source/` folder | Media & Software Manger | All code, documentation, CI workflows (`ci`, `secret-scan`). **No secrets**: the workflows need none. |
+| A2 | Hosting | Cloudflare Workers (Free) | Worker `fernhill-order-sync`, address `fernhill.mediaandsoftwaremanager.com` (custom domain on the developer's zone), code in `web/` | Media & Software Manger's Cloudflare account | The web app, 9 Worker secrets (B1–B9), the daily Cron Trigger. Deployed with `npm run deploy` from `web/` |
+| A3 | Database project | Supabase (Free) | Project `fernhill-order-sync`, organisation `MSmanager`, region Northeast Asia (Seoul) | Media & Software Manger | All tables and data, Vault secrets (C1–C2), the per-minute scheduler job `drain-every-minute` |
+| A4 | CRM account | HubSpot (free CRM) | Account "media and software company" | Media & Software Manger | Demo contacts and deals, the app (A5), the property group *Demo order data* |
 | A5 | HubSpot app | HubSpot developer project (platform 2026.09) | Project `fernhill-order-sync`, app "Fernhill Order Sync (demo)" (private, static token), card "Orders (Fernhill demo)", webhook subscriptions | Lives inside A4 | Access token (B1), client secret (B2), app ID (B3) |
-| A6 | Local configuration | Developer computer | `.env.local` in the repository folder (gitignored) | Media & Software Manager | Copies of every secret below, used by the setup and operations scripts |
+| A6 | Local configuration | Developer computer | `.env.local` in the repository folder (gitignored) | Media & Software Manger | Copies of every secret below, used by the setup and operations scripts |
 
 ## Secrets and keys
 

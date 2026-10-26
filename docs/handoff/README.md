@@ -1,6 +1,6 @@
 # Fernhill Order Sync: client handoff package
 
-**Prepared by Media & Software Manager** · Version 1.0 · 9 October 2026
+**Prepared by Media & Software Manger** · Version 1.0 · 9 October 2026
 
 This package hands over the Fernhill Order Sync integration (HubSpot ↔ Supabase ↔ Cloudflare Workers) to the team that will
 own and run it.
